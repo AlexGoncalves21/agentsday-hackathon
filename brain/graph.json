@@ -1,27 +1,27 @@
 {
-  "build_id": "ec8c4d99ab38b15d",
+  "build_id": "454816b823c5f07c",
   "edges": [
     {
-      "hash": "b3189991c177d8dc",
-      "id": "companies/multiverse-computing.md->people/demis-hassabis.md",
-      "score": 5.3529,
+      "hash": "28cb30a6ecfb6e3d",
+      "id": "concepts/ai-is-no-ui.md->people/demis-hassabis.md",
+      "score": 4.4327,
       "shared_terms": [
         "ai"
       ],
-      "source": "companies/multiverse-computing.md",
+      "source": "concepts/ai-is-no-ui.md",
       "status": "new",
       "target": "people/demis-hassabis.md",
       "type": "semantic_similarity"
     },
     {
-      "hash": "1b2f8c73a3c833d8",
+      "hash": "f415f6969fdc6dd0",
       "id": "concepts/conways-game-of-life.md->concepts/fibonacci.md",
-      "score": 4.5274,
+      "score": 4.2398,
       "shared_terms": [
         "rule"
       ],
       "source": "concepts/conways-game-of-life.md",
-      "status": "new",
+      "status": "unchanged",
       "target": "concepts/fibonacci.md",
       "type": "semantic_similarity"
     },
@@ -33,77 +33,98 @@
         "game"
       ],
       "source": "concepts/conways-game-of-life.md",
-      "status": "new",
+      "status": "unchanged",
       "target": "concepts/game-theory.md",
       "type": "semantic_similarity"
     },
     {
-      "hash": "afbbff5636407d46",
+      "hash": "5a4c1d0e9b0eafcd",
       "id": "concepts/decision-theory.md->concepts/game-theory.md",
-      "score": 11.6806,
+      "score": 12.4079,
       "shared_terms": [
         "decision",
         "theory"
       ],
       "source": "concepts/decision-theory.md",
-      "status": "new",
+      "status": "unchanged",
       "target": "concepts/game-theory.md",
       "type": "semantic_similarity"
     },
     {
-      "hash": "9398e3f400bba6b7",
+      "hash": "28e442886c61f61b",
       "id": "concepts/decision-theory.md->concepts/intelligence-vs-agency.md",
-      "score": 5.6116,
+      "score": 5.8588,
       "shared_terms": [
         "action"
       ],
       "source": "concepts/decision-theory.md",
-      "status": "new",
+      "status": "unchanged",
       "target": "concepts/intelligence-vs-agency.md",
       "type": "semantic_similarity"
     },
     {
-      "hash": "21a0ec01950495a8",
+      "hash": "35c9e87df8d0a6ed",
       "id": "concepts/decision-theory.md->topics/agent-frameworks-and-elixir-otp.md",
-      "score": 4.54,
+      "score": 4.929,
       "shared_terms": [
         "agent"
       ],
       "source": "concepts/decision-theory.md",
-      "status": "new",
+      "status": "unchanged",
       "target": "topics/agent-frameworks-and-elixir-otp.md",
       "type": "semantic_similarity"
     },
     {
-      "hash": "1793607c987281da",
+      "hash": "530174dc57bcdc5d",
+      "id": "concepts/fibonacci.md->concepts/roman-empire.md",
+      "score": 4.7269,
+      "shared_terms": [
+        "known"
+      ],
+      "source": "concepts/fibonacci.md",
+      "status": "new",
+      "target": "concepts/roman-empire.md",
+      "type": "semantic_similarity"
+    },
+    {
+      "hash": "d5f62be74eeb0444",
       "id": "concepts/lei-de-murphy.md->topics/agent-frameworks-and-elixir-otp.md",
-      "score": 6.3809,
+      "score": 6.662,
       "shared_terms": [
         "failure"
       ],
       "source": "concepts/lei-de-murphy.md",
-      "status": "new",
+      "status": "unchanged",
       "target": "topics/agent-frameworks-and-elixir-otp.md",
       "type": "semantic_similarity"
     }
   ],
-  "generated_at": "2026-05-01T16:10:57+01:00",
+  "generated_at": "2026-05-01T16:14:41+01:00",
   "nodes": [
     {
       "hash": "a9cea97c4b6abfbd",
       "id": "companies/multiverse-computing.md",
       "label": "Multiverse Computing",
       "path": "brain/companies/multiverse-computing.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Multiverse Computing is a company focused on efficient and sovereign AI, with public messaging around quantum-inspired techniques, model compression, and production-ready AI deployment. Its product CompactifAI is positioned as a way to com...",
       "type": "company"
+    },
+    {
+      "hash": "a5b486fdbf6ddfea",
+      "id": "concepts/ai-is-no-ui.md",
+      "label": "AI Is No UI",
+      "path": "brain/concepts/ai-is-no-ui.md",
+      "status": "new",
+      "summary": "X/Twitter post captured from the exact submitted status URL. Author: naval Created at: Wed Mar 20 03:49:17 +0000 2024 Post text: The promise of AI is no UI. Linked or media URLs: - https://x.com/naval/status/1770296527120166927 - https://t...",
+      "type": "concept"
     },
     {
       "hash": "e5116e24c21e5f59",
       "id": "concepts/conways-game-of-life.md",
       "label": "Conway's Game of Life",
       "path": "brain/concepts/conways-game-of-life.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Conway's Game of Life is a cellular automaton devised by mathematician John Horton Conway and popularized in 1970 through Martin Gardner's Mathematical Games column in Scientific American. It is called a game, but it is usually described a...",
       "type": "concept"
     },
@@ -112,7 +133,7 @@
       "id": "concepts/decision-theory.md",
       "label": "Decision Theory",
       "path": "brain/concepts/decision-theory.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Decision theory studies how agents make, or should make, choices among alternatives under uncertainty. It sits close to economics, philosophy, statistics, psychology, computer science, and AI. It is especially important for understanding a...",
       "type": "concept"
     },
@@ -121,7 +142,7 @@
       "id": "concepts/design-patterns.md",
       "label": "Design Patterns",
       "path": "brain/concepts/design-patterns.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Design patterns are reusable solutions to recurring design problems. They are not finished code, libraries, or rigid templates. A pattern names a common problem, describes the forces and tradeoffs around it, and gives a reusable shape for...",
       "type": "concept"
     },
@@ -130,7 +151,7 @@
       "id": "concepts/fibonacci.md",
       "label": "Fibonacci",
       "path": "brain/concepts/fibonacci.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Fibonacci commonly refers to Leonardo of Pisa, also known as Fibonacci, a medieval Italian mathematician. He is best known for helping popularize Hindu-Arabic numerals in Europe through Liber Abaci, a 1202 book that introduced practical ar...",
       "type": "concept"
     },
@@ -139,7 +160,7 @@
       "id": "concepts/game-theory.md",
       "label": "Game Theory",
       "path": "brain/concepts/game-theory.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Game theory studies strategic interaction: situations where the outcome for each participant depends not only on their own decisions but also on the decisions of others. It provides mathematical and conceptual tools for reasoning about con...",
       "type": "concept"
     },
@@ -148,7 +169,7 @@
       "id": "concepts/intelligence-vs-agency.md",
       "label": "Intelligence vs Agency",
       "path": "brain/concepts/intelligence-vs-agency.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Intelligence and agency are related but different concepts. Intelligence is the capacity to understand, model, reason, generate, predict, and compress patterns. Agency is the capacity to pursue goals through time by selecting actions, usin...",
       "type": "concept"
     },
@@ -157,7 +178,7 @@
       "id": "concepts/lei-de-murphy.md",
       "label": "Lei de Murphy",
       "path": "brain/concepts/lei-de-murphy.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Lei de Murphy is the Portuguese name for Murphy's Law. The common formulation is: if something can go wrong, it will go wrong. The phrase is usually humorous, but its practical value is as an engineering heuristic. It encourages designers...",
       "type": "concept"
     },
@@ -166,8 +187,17 @@
       "id": "concepts/monte-carlo-and-markov-chains.md",
       "label": "Monte Carlo and Markov Chains",
       "path": "brain/concepts/monte-carlo-and-markov-chains.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Monte Carlo methods use random sampling to estimate quantities that are difficult or impossible to calculate exactly. They are useful when a problem has uncertainty, high dimensionality, complex integrals, or many possible outcomes. Instea...",
+      "type": "concept"
+    },
+    {
+      "hash": "92e613a316df9dd3",
+      "id": "concepts/roman-empire.md",
+      "label": "Roman Empire",
+      "path": "brain/concepts/roman-empire.md",
+      "status": "new",
+      "summary": "The Roman Empire represents the final and most expansive period of ancient Roman civilization, transitioning from a republic to an autocratic state governed by emperors. Its imperial phase is generally considered to have begun in 27 BC wit...",
       "type": "concept"
     },
     {
@@ -175,7 +205,7 @@
       "id": "concepts/self-hosting.md",
       "label": "Self-Hosting",
       "path": "brain/concepts/self-hosting.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Self-hosting means running software or services on infrastructure you control instead of relying entirely on third-party SaaS providers. For personal infrastructure, this can mean a home server, VPS, NAS, rented bare-metal machine, private...",
       "type": "concept"
     },
@@ -184,7 +214,7 @@
       "id": "concepts/tatica-do-quadrado.md",
       "label": "Tatica do Quadrado",
       "path": "brain/concepts/tatica-do-quadrado.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Tatica do quadrado likely refers to the 2x2 tactical system in futsal, often called \"quadrado\" because the four outfield players form a square-like structure. Two players tend to occupy more defensive positions and two occupy more advanced...",
       "type": "concept"
     },
@@ -193,7 +223,7 @@
       "id": "events/batalha-de-aljubarrota.md",
       "label": "Batalha de Aljubarrota",
       "path": "brain/events/batalha-de-aljubarrota.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "A Batalha de Aljubarrota foi travada em 14 de agosto de 1385 entre o Reino de Portugal e a Coroa de Castela. A batalha foi decisiva para consolidar a independencia portuguesa durante a crise de 1383-1385. As forcas portuguesas, lideradas p...",
       "type": "event"
     },
@@ -202,7 +232,7 @@
       "id": "people/demis-hassabis.md",
       "label": "Demis Hassabis",
       "path": "brain/people/demis-hassabis.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "Demis Hassabis is a British AI researcher, entrepreneur, and the co-founder and CEO of Google DeepMind. DeepMind was founded in London in 2010 and acquired by Google in 2014. In 2023, Google combined DeepMind and Google Brain into Google D...",
       "type": "person"
     },
@@ -211,7 +241,7 @@
       "id": "topics/agent-frameworks-and-elixir-otp.md",
       "label": "Agent Frameworks and Elixir/OTP",
       "path": "brain/topics/agent-frameworks-and-elixir-otp.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "The article \"Your Agent Framework Is Just a Bad Clone of Elixir: Concurrency Lessons from Telecom to AI\" argues that many modern AI agent frameworks are rediscovering runtime ideas that the Erlang/Elixir ecosystem has treated as normal for...",
       "type": "topic"
     },
@@ -220,7 +250,7 @@
       "id": "works/all-tomorrows.md",
       "label": "All Tomorrows",
       "path": "brain/works/all-tomorrows.md",
-      "status": "new",
+      "status": "unchanged",
       "summary": "All Tomorrows is a speculative evolution and science fiction work by Turkish artist and author C. M. Kosemen. Its full title is commonly given as \"All Tomorrows: A Billion Year Chronicle of the Myriad Species and Mixed Fortunes of Man.\" It...",
       "type": "work"
     }

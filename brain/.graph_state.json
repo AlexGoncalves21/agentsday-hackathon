@@ -1,32 +1,38 @@
 {
-  "build_id": "ec8c4d99ab38b15d",
+  "build_id": "454816b823c5f07c",
   "edges": {
-    "companies/multiverse-computing.md->people/demis-hassabis.md": {
-      "hash": "b3189991c177d8dc"
+    "concepts/ai-is-no-ui.md->people/demis-hassabis.md": {
+      "hash": "28cb30a6ecfb6e3d"
     },
     "concepts/conways-game-of-life.md->concepts/fibonacci.md": {
-      "hash": "1b2f8c73a3c833d8"
+      "hash": "f415f6969fdc6dd0"
     },
     "concepts/conways-game-of-life.md->concepts/game-theory.md": {
       "hash": "f9c7c7c80c83addd"
     },
     "concepts/decision-theory.md->concepts/game-theory.md": {
-      "hash": "afbbff5636407d46"
+      "hash": "5a4c1d0e9b0eafcd"
     },
     "concepts/decision-theory.md->concepts/intelligence-vs-agency.md": {
-      "hash": "9398e3f400bba6b7"
+      "hash": "28e442886c61f61b"
     },
     "concepts/decision-theory.md->topics/agent-frameworks-and-elixir-otp.md": {
-      "hash": "21a0ec01950495a8"
+      "hash": "35c9e87df8d0a6ed"
+    },
+    "concepts/fibonacci.md->concepts/roman-empire.md": {
+      "hash": "530174dc57bcdc5d"
     },
     "concepts/lei-de-murphy.md->topics/agent-frameworks-and-elixir-otp.md": {
-      "hash": "1793607c987281da"
+      "hash": "d5f62be74eeb0444"
     }
   },
-  "generated_at": "2026-05-01T16:10:57+01:00",
+  "generated_at": "2026-05-01T16:14:41+01:00",
   "nodes": {
     "companies/multiverse-computing.md": {
       "hash": "a9cea97c4b6abfbd"
+    },
+    "concepts/ai-is-no-ui.md": {
+      "hash": "a5b486fdbf6ddfea"
     },
     "concepts/conways-game-of-life.md": {
       "hash": "e5116e24c21e5f59"
@@ -51,6 +57,9 @@
     },
     "concepts/monte-carlo-and-markov-chains.md": {
       "hash": "097036f4c8eab2ea"
+    },
+    "concepts/roman-empire.md": {
+      "hash": "92e613a316df9dd3"
     },
     "concepts/self-hosting.md": {
       "hash": "67ac69383aaf295f"

@@ -1,43 +1,17 @@
 # Run Report
 
-Date: 2026-05-01T16:10:57+01:00
+Date: 2026-05-01T16:14:41+01:00
 Mode: `scan`
 
 ## Inputs Processed
 
-- input/2026-05-01-agent-frameworks-elixir.md
-- input/2026-05-01-all-tomorrows.md
-- input/2026-05-01-batalha-de-aljubarrota.md
-- input/2026-05-01-decision-theory.md
-- input/2026-05-01-demis-hassabis.md
-- input/2026-05-01-design-patterns.md
-- input/2026-05-01-fibonacci.md
-- input/2026-05-01-game-of-life.md
-- input/2026-05-01-game-theory.md
-- input/2026-05-01-intelligence-vs-agency-karpathy.md
-- input/2026-05-01-lei-de-murphy.md
-- input/2026-05-01-monte-carlo-markov.md
-- input/2026-05-01-multiverse-computing.md
-- input/2026-05-01-self-hosting.md
-- input/2026-05-01-tatica-do-quadrado.md
+- input/2026-05-01-134526-roman-empire.md
+- input/2026-05-01-135824-x-post-by-naval-the-promise-of-ai-is-no-ui.md
 
 ## Pages Written
 
-- brain/topics/agent-frameworks-and-elixir-otp.md
-- brain/works/all-tomorrows.md
-- brain/events/batalha-de-aljubarrota.md
-- brain/concepts/decision-theory.md
-- brain/people/demis-hassabis.md
-- brain/concepts/design-patterns.md
-- brain/concepts/fibonacci.md
-- brain/concepts/conways-game-of-life.md
-- brain/concepts/game-theory.md
-- brain/concepts/intelligence-vs-agency.md
-- brain/concepts/lei-de-murphy.md
-- brain/concepts/monte-carlo-and-markov-chains.md
-- brain/companies/multiverse-computing.md
-- brain/concepts/self-hosting.md
-- brain/concepts/tatica-do-quadrado.md
+- brain/concepts/roman-empire.md
+- brain/concepts/ai-is-no-ui.md
 
 ## Quality Checks
 
@@ -60,12 +34,12 @@ Mode: `scan`
 
 ## Graph
 
-- Nodes: 15
-- Edges: 7
-- New nodes: 15
+- Nodes: 17
+- Edges: 8
+- New nodes: 2
 - Changed nodes: 0
-- New edges: 7
-- Removed edges: 0
+- New edges: 2
+- Removed edges: 1
 
 ## Trace
 

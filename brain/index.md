@@ -2,7 +2,7 @@
 
 This index is generated at the end of the Organizer build and links to the Markdown files that make up the compiled second brain.
 
-Compiled inputs: 15
+Compiled inputs: 17
 
 ## Core
 
@@ -19,6 +19,7 @@ Compiled inputs: 15
 
 ## Concepts
 
+- [AI Is No UI](concepts/ai-is-no-ui.md)
 - [Conway's Game of Life](concepts/conways-game-of-life.md)
 - [Decision Theory](concepts/decision-theory.md)
 - [Design Patterns](concepts/design-patterns.md)
@@ -27,6 +28,7 @@ Compiled inputs: 15
 - [Intelligence vs Agency](concepts/intelligence-vs-agency.md)
 - [Lei de Murphy](concepts/lei-de-murphy.md)
 - [Monte Carlo and Markov Chains](concepts/monte-carlo-and-markov-chains.md)
+- [Roman Empire](concepts/roman-empire.md)
 - [Self-Hosting](concepts/self-hosting.md)
 - [Tatica do Quadrado](concepts/tatica-do-quadrado.md)
 
@@ -61,5 +63,7 @@ Compiled inputs: 15
 - [Lei de Murphy](sources/2026-05-01-lei-de-murphy.md)
 - [Monte Carlo and Markov Chains](sources/2026-05-01-monte-carlo-markov.md)
 - [Multiverse Computing](sources/2026-05-01-multiverse-computing.md)
+- [Roman Empire](sources/2026-05-01-134526-roman-empire.md)
 - [Self-Hosting](sources/2026-05-01-self-hosting.md)
 - [Tatica do Quadrado](sources/2026-05-01-tatica-do-quadrado.md)
+- [X Post by naval: The promise of AI is no UI.](sources/2026-05-01-135824-x-post-by-naval-the-promise-of-ai-is-no-ui.md)

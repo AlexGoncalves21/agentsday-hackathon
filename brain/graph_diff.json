@@ -1,17 +1,21 @@
 {
-  "build_id": "ec8c4d99ab38b15d",
+  "build_id": "454816b823c5f07c",
   "changed_nodes": [],
-  "generated_at": "2026-05-01T16:10:57+01:00",
+  "generated_at": "2026-05-01T16:14:41+01:00",
   "new_edges": [
-    "companies/multiverse-computing.md->people/demis-hassabis.md",
-    "concepts/conways-game-of-life.md->concepts/fibonacci.md",
-    "concepts/conways-game-of-life.md->concepts/game-theory.md",
-    "concepts/decision-theory.md->concepts/game-theory.md",
-    "concepts/decision-theory.md->concepts/intelligence-vs-agency.md",
-    "concepts/decision-theory.md->topics/agent-frameworks-and-elixir-otp.md",
-    "concepts/lei-de-murphy.md->topics/agent-frameworks-and-elixir-otp.md"
+    "concepts/ai-is-no-ui.md->people/demis-hassabis.md",
+    "concepts/fibonacci.md->concepts/roman-empire.md"
   ],
   "new_nodes": [
+    "concepts/ai-is-no-ui.md",
+    "concepts/roman-empire.md"
+  ],
+  "previous_build_id": "ec8c4d99ab38b15d",
+  "removed_edges": [
+    "companies/multiverse-computing.md->people/demis-hassabis.md"
+  ],
+  "removed_nodes": [],
+  "unchanged_nodes": [
     "companies/multiverse-computing.md",
     "concepts/conways-game-of-life.md",
     "concepts/decision-theory.md",
@@ -27,9 +31,5 @@
     "people/demis-hassabis.md",
     "topics/agent-frameworks-and-elixir-otp.md",
     "works/all-tomorrows.md"
-  ],
-  "previous_build_id": null,
-  "removed_edges": [],
-  "removed_nodes": [],
-  "unchanged_nodes": []
+  ]
 }

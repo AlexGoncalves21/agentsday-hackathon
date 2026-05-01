@@ -31,6 +31,7 @@ const NODE_RADIUS = 7.25
 const NODE_HIT_RADIUS = 20.25
 const NODE_LABEL_FONT_SIZE = 11.5
 const NODE_LABEL_STROKE_WIDTH = 3
+const LINK_NODE_CLEARANCE = 18
 
 function displayStatus(status, isSeen) {
   return isSeen ? 'unchanged' : status
@@ -577,16 +578,15 @@ export default function App() {
                   const source = renderedNodes[link.sourceIndex]
                   const target = renderedNodes[link.targetIndex]
                   if (!source || !target) return null
+                  const path = linkPathAvoidingNodes(source, target, renderedNodes)
                   return (
-                    <line
+                    <path
                       key={link.id}
-                      x1={source.x}
-                      y1={source.y}
-                      x2={target.x}
-                      y2={target.y}
+                      d={path}
                       className={`graph-link graph-link-${link.status} ${
                         selectedLink?.id === link.id ? 'graph-link-selected' : ''
                       }`}
+                      fill="none"
                       stroke={link.color}
                       strokeWidth={link.width}
                     />
@@ -1231,11 +1231,44 @@ function stableLayout(rawNodes, rawEdges = []) {
     }
   }
 
+  resolveNodeCollisions(nodes, 26)
+
   return nodes.map(({ vx, vy, ...node }) => ({
     ...node,
     x: Math.round(node.x),
     y: Math.round(node.y),
   }))
+}
+
+function resolveNodeCollisions(nodes, minDistance) {
+  for (let iteration = 0; iteration < 80; iteration += 1) {
+    let moved = false
+    for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+        const left = nodes[leftIndex]
+        const right = nodes[rightIndex]
+        let dx = right.x - left.x
+        let dy = right.y - left.y
+        let distance = Math.sqrt(dx * dx + dy * dy)
+        if (!distance) {
+          const angle = hashToUnit(`${left.id}:${right.id}`) * Math.PI * 2
+          dx = Math.cos(angle) * 0.01
+          dy = Math.sin(angle) * 0.01
+          distance = 0.01
+        }
+        if (distance >= minDistance) continue
+        const push = (minDistance - distance) / 2
+        const fx = (dx / distance) * push
+        const fy = (dy / distance) * push
+        left.x -= fx
+        left.y -= fy
+        right.x += fx
+        right.y += fy
+        moved = true
+      }
+    }
+    if (!moved) break
+  }
 }
 
 function communitiesFor(rawNodes, rawEdges) {
@@ -1369,6 +1402,32 @@ function isInsidePane(event, pane) {
     event.clientY >= rect.top &&
     event.clientY <= rect.bottom
   )
+}
+
+function linkPathAvoidingNodes(source, target, nodes) {
+  const dx = target.x - source.x
+  const dy = target.y - source.y
+  const length = Math.sqrt(dx * dx + dy * dy) || 1
+  const normal = { x: -dy / length, y: dx / length }
+  const midpoint = { x: (source.x + target.x) / 2, y: (source.y + target.y) / 2 }
+  const blockers = nodes.filter((node) => {
+    if (node.id === source.id || node.id === target.id) return false
+    return distanceToSegment(node, source, target) < LINK_NODE_CLEARANCE
+  })
+
+  if (!blockers.length) return `M ${source.x} ${source.y} L ${target.x} ${target.y}`
+
+  const side = blockers.reduce((sum, node) => {
+    const sideValue = Math.sign((node.x - midpoint.x) * normal.x + (node.y - midpoint.y) * normal.y)
+    return sum + (sideValue || 1)
+  }, 0)
+  const direction = side >= 0 ? -1 : 1
+  const offset = Math.min(42, 18 + blockers.length * 8)
+  const control = {
+    x: midpoint.x + normal.x * offset * direction,
+    y: midpoint.y + normal.y * offset * direction,
+  }
+  return `M ${source.x} ${source.y} Q ${control.x} ${control.y} ${target.x} ${target.y}`
 }
 
 function graphScaleFor(pane, viewBox) {

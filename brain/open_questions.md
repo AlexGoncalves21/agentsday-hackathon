@@ -8,3 +8,7 @@
 - Review uncertainty in [Monte Carlo and Markov Chains](concepts/monte-carlo-and-markov-chains.md).
 - Review uncertainty in [Self-Hosting](concepts/self-hosting.md).
 - Review uncertainty in [Tatica do Quadrado](concepts/tatica-do-quadrado.md).
+
+## Latest Scan
+
+- Review uncertainty in [Roman Empire](concepts/roman-empire.md).
