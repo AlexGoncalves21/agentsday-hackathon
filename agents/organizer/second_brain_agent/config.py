@@ -37,6 +37,9 @@ def load_agent_config(config_path: Path, workspace: Path) -> AgentConfig:
         model=ModelConfig(
             provider=str(model.get("provider", "gemini")),
             name=str(model["name"]),
+            reasoning_effort=str(model.get("reasoning_effort", "high")),
+            thinking_budget=int(model.get("thinking_budget", 2048)),
+            temperature=float(model.get("temperature", 0.2)),
         ),
         loop=LoopConfig(max_iterations=int(loop.get("max_iterations", 3))),
     )
@@ -50,4 +53,3 @@ def load_prompt_config(prompt_path: Path) -> PromptConfig:
         compiler_behavior=list(data.get("compiler_behavior", [])),
         sub_agents=dict(data.get("sub_agents", {})),
     )
-

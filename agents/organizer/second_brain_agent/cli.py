@@ -5,8 +5,6 @@ import os
 from pathlib import Path
 
 from .compiler import WikiCompiler
-from .config import load_agent_config, load_prompt_config
-from .deep_agent import run_deep_agent
 from .env import load_dotenv
 from .markdown import parse_input_document
 
@@ -25,7 +23,12 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument(
         "--use-llm",
         action="store_true",
-        help="Run through LangChain Deep Agents instead of the deterministic compiler",
+        help="Deprecated: LLM reasoning is now the default for Organizer runs.",
+    )
+    run_parser.add_argument(
+        "--deterministic",
+        action="store_true",
+        help="Run the local deterministic compiler without model reasoning or LangSmith model traces.",
     )
     run_parser.add_argument(
         "--no-langsmith",
@@ -60,18 +63,18 @@ def main(argv: list[str] | None = None) -> int:
         load_dotenv(workspace / ".env")
         if args.no_langsmith:
             _disable_langsmith()
-        if args.use_llm:
-            config = load_agent_config(config_path, workspace)
-            prompts = load_prompt_config(prompt_path)
-            result = run_deep_agent(config, prompts, workspace)
-            print(result)
-            return 0
+        elif not args.deterministic:
+            _enable_langsmith_defaults()
 
-        compiler = WikiCompiler.from_files(config_path, prompt_path, workspace)
+        compiler = WikiCompiler.from_files(config_path, prompt_path, workspace, enable_reasoning=not args.deterministic)
         result = compiler.run()
         failed = [check for check in result.quality_checks if not check.passed]
         print(f"Processed {result.inputs_processed} inputs.")
         print(f"Wrote {result.pages_written} compiled pages and {result.source_pages_written} source pages.")
+        print(
+            f"Organizer loop: {result.iterations_run} iteration(s), "
+            f"{'stabilized' if result.stabilized else 'max iterations reached'}."
+        )
         print(f"Report: {result.report_path}")
         if failed:
             print("Warnings:")
@@ -149,6 +152,15 @@ def _disable_langsmith() -> None:
         "LANGCHAIN_WORKSPACE_ID",
     ]:
         os.environ.pop(key, None)
+
+
+def _enable_langsmith_defaults() -> None:
+    if not (os.environ.get("LANGSMITH_API_KEY") or os.environ.get("LANGCHAIN_API_KEY")):
+        raise RuntimeError("LANGSMITH_API_KEY is required because Organizer model reasoning is always enabled.")
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+    os.environ.setdefault("LANGSMITH_PROJECT", "agentsday")
+    os.environ.setdefault("LANGCHAIN_PROJECT", os.environ["LANGSMITH_PROJECT"])
 
 
 def _looks_like_uuid(value: str) -> bool:

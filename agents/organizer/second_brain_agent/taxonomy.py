@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import math
+import re
+from collections import Counter
 from typing import Dict, Iterable, List
 
 from .models import InputDocument
@@ -14,78 +17,10 @@ CATEGORY_BY_SLUG = {
     "agent-frameworks-and-elixir-otp": "topics",
 }
 
-RELATED_BY_SLUG = {
-    "intelligence-vs-agency": [
-        "agent-frameworks-and-elixir-otp",
-        "decision-theory",
-        "design-patterns",
-    ],
-    "agent-frameworks-and-elixir-otp": [
-        "intelligence-vs-agency",
-        "design-patterns",
-        "lei-de-murphy",
-        "self-hosting",
-    ],
-    "demis-hassabis": [
-        "game-theory",
-        "decision-theory",
-    ],
-    "game-theory": [
-        "decision-theory",
-        "batalha-de-aljubarrota",
-        "tatica-do-quadrado",
-    ],
-    "decision-theory": [
-        "game-theory",
-        "monte-carlo-and-markov-chains",
-        "intelligence-vs-agency",
-    ],
-    "design-patterns": [
-        "agent-frameworks-and-elixir-otp",
-        "tatica-do-quadrado",
-        "intelligence-vs-agency",
-    ],
-    "lei-de-murphy": [
-        "agent-frameworks-and-elixir-otp",
-        "self-hosting",
-    ],
-    "fibonacci": [
-        "conways-game-of-life",
-        "monte-carlo-and-markov-chains",
-    ],
-    "batalha-de-aljubarrota": [
-        "game-theory",
-        "decision-theory",
-        "tatica-do-quadrado",
-    ],
-    "self-hosting": [
-        "multiverse-computing",
-        "agent-frameworks-and-elixir-otp",
-        "lei-de-murphy",
-    ],
-    "monte-carlo-and-markov-chains": [
-        "decision-theory",
-        "conways-game-of-life",
-        "fibonacci",
-    ],
-    "conways-game-of-life": [
-        "fibonacci",
-        "monte-carlo-and-markov-chains",
-        "all-tomorrows",
-    ],
-    "tatica-do-quadrado": [
-        "game-theory",
-        "batalha-de-aljubarrota",
-        "design-patterns",
-    ],
-    "multiverse-computing": [
-        "self-hosting",
-        "intelligence-vs-agency",
-    ],
-    "all-tomorrows": [
-        "conways-game-of-life",
-    ],
-}
+TOKEN_RE = re.compile(r"[\w]+", re.UNICODE)
+MAX_RELEVANT_TERMS = 14
+MAX_RELATED_SLUGS = 6
+MIN_SHARED_TFIDF_SCORE = 0.28
 
 
 def category_for(document: InputDocument) -> str:
@@ -93,29 +28,46 @@ def category_for(document: InputDocument) -> str:
 
 
 def related_slugs_for(document: InputDocument, all_documents: Iterable[InputDocument]) -> List[str]:
-    available = {doc.slug for doc in all_documents}
-    explicit = [slug for slug in RELATED_BY_SLUG.get(document.slug, []) if slug in available]
-    heuristic = [
-        other.slug
-        for other in all_documents
-        if other.slug != document.slug and _is_related(document, other)
-    ]
-    return list(dict.fromkeys(explicit + heuristic))
+    documents = list(all_documents)
+    relevant_terms_by_slug = _relevant_terms_by_slug(documents)
+    document_terms = relevant_terms_by_slug.get(document.slug, {})
+    related = []
+    for other in documents:
+        if other.slug == document.slug:
+            continue
+        shared_terms = document_terms.keys() & relevant_terms_by_slug.get(other.slug, {}).keys()
+        shared_score = sum(min(document_terms[term], relevant_terms_by_slug[other.slug][term]) for term in shared_terms)
+        if shared_score >= MIN_SHARED_TFIDF_SCORE:
+            related.append((other.slug, shared_score, sorted(shared_terms)))
+    related.sort(key=lambda item: (-item[1], item[0]))
+    return [slug for slug, _score, _terms in related[:MAX_RELATED_SLUGS]]
 
 
-def _is_related(left: InputDocument, right: InputDocument) -> bool:
-    left_terms = _title_terms(left)
-    right_terms = _title_terms(right)
-    if len(left_terms & right_terms) >= 2:
-        return True
-    return bool(_expanded_terms(left_terms) & right_terms) or bool(left_terms & _expanded_terms(right_terms))
+def _relevant_terms_by_slug(documents: List[InputDocument]) -> Dict[str, Dict[str, float]]:
+    term_counts_by_slug = {document.slug: _term_counts(document) for document in documents}
+    document_frequency: Counter[str] = Counter()
+    for term_counts in term_counts_by_slug.values():
+        document_frequency.update(term_counts.keys())
+
+    document_count = max(len(documents), 1)
+    relevant_terms_by_slug = {}
+    for document in documents:
+        term_counts = term_counts_by_slug[document.slug]
+        scores = {}
+        for term, count in term_counts.items():
+            idf = math.log((1 + document_count) / (1 + document_frequency[term])) + 1
+            scores[term] = (1 + math.log(count)) * idf
+        top_terms = sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:MAX_RELEVANT_TERMS]
+        relevant_terms_by_slug[document.slug] = {term: round(score, 4) for term, score in top_terms}
+    return relevant_terms_by_slug
 
 
-def _title_terms(document: InputDocument) -> set[str]:
-    return _interesting_words(" ".join([document.title, document.slug]))
+def _term_counts(document: InputDocument) -> Counter[str]:
+    weighted_text = " ".join([document.title, document.slug, document.title, document.slug, document.information])
+    return Counter(_tokens(weighted_text))
 
 
-def _interesting_words(value: str) -> set[str]:
+def _tokens(value: str) -> List[str]:
     stopwords = {
         "and",
         "the",
@@ -142,23 +94,36 @@ def _interesting_words(value: str) -> set[str]:
         "information",
         "topic",
         "concept",
+        "input",
+        "file",
+        "original",
+        "summary",
+        "compiled",
+        "into",
+        "http",
+        "https",
+        "www",
+        "com",
+        "example",
     }
-    normalized = value.lower().replace("/", " ").replace("-", " ")
-    short_terms = {"ai", "ui"}
-    return {
-        word.strip(".,:;!?()[]`'\"")
-        for word in normalized.split()
-        if word not in stopwords and (len(word) > 2 or word in short_terms)
-    }
+    short_terms = {"ai", "ui", "llm"}
+    tokens = []
+    for raw_token in TOKEN_RE.findall(value.lower().replace("/", " ").replace("-", " ")):
+        token = _normalize_token(raw_token)
+        if token in stopwords:
+            continue
+        if len(token) <= 2 and token not in short_terms:
+            continue
+        tokens.append(token)
+    return tokens
 
 
-def _expanded_terms(terms: set[str]) -> set[str]:
-    expanded = set()
-    if "ai" in terms:
-        expanded.update({"agent", "agents", "agency", "intelligence", "automation", "llm", "model"})
-    if "ui" in terms:
-        expanded.update({"interface", "interfaces", "software", "tooling"})
-    return expanded
+def _normalize_token(token: str) -> str:
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 4 and token.endswith("s"):
+        return token[:-1]
+    return token
 
 
 def group_by_category(documents: Iterable[InputDocument]) -> Dict[str, List[InputDocument]]:

@@ -170,7 +170,7 @@ function runOrganizer() {
     const configPath = writeScanConfig()
     const python = pythonForOrganizer()
     if (!python) {
-      const error = new Error('Could not find a Python interpreter with PyYAML installed.')
+      const error = new Error('Could not find a Python 3.11+ interpreter with Organizer LLM/LangSmith dependencies installed.')
       error.output = ''
       reject(error)
       return
@@ -214,12 +214,27 @@ function pythonForOrganizer() {
     path.join(os.homedir(), 'anaconda3/bin/python3'),
     path.join(repoRoot, '.venv/bin/python'),
     path.join(repoRoot, '.venv/bin/python3'),
+    'python3.12',
+    'python3.11',
     loginShellPython,
     'python3',
   ].filter(Boolean)
 
   organizerPython = candidates.find((candidate) => {
-    const check = spawnSync(candidate, ['-c', 'import yaml'], { cwd: repoRoot, encoding: 'utf8' })
+    const check = spawnSync(
+      candidate,
+      [
+        '-c',
+        [
+          'import sys',
+          'assert sys.version_info >= (3, 11)',
+          'import yaml',
+          'import langsmith',
+          'import langchain_google_genai',
+        ].join('; '),
+      ],
+      { cwd: repoRoot, encoding: 'utf8' },
+    )
     return check.status === 0
   })
   return organizerPython
@@ -239,6 +254,9 @@ paths:
 model:
   provider: gemini
   name: gemini-3-flash-preview
+  reasoning_effort: high
+  thinking_budget: 2048
+  temperature: 0.2
 
 loop:
   max_iterations: 3

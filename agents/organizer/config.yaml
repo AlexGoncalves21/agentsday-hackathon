@@ -8,6 +8,9 @@ paths:
 model:
   provider: gemini
   name: gemini-3-flash-preview
+  reasoning_effort: high
+  thinking_budget: 2048
+  temperature: 0.2
 
 loop:
   max_iterations: 3

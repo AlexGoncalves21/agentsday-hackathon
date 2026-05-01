@@ -33,6 +33,28 @@ class GraphBuilderTests(unittest.TestCase):
             history = json.loads((brain / "graph_history.json").read_text())
             self.assertEqual(history["graphs"][0]["build_id"], graph["build_id"])
 
+    def test_uses_planned_semantic_links_without_visible_markdown_links(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            brain = Path(tmp) / "brain"
+            concepts = brain / "concepts"
+            concepts.mkdir(parents=True)
+            (concepts / "vector-search.md").write_text("# Vector Search\n\nEmbeddings and retrieval.\n")
+            (concepts / "semantic-retrieval.md").write_text("# Semantic Retrieval\n\nQuery similarity.\n")
+
+            result = build_graph_files(
+                brain,
+                {"nodes": {}, "edges": {}},
+                datetime.now(timezone.utc),
+                {
+                    "concepts/vector-search.md": ["concepts/semantic-retrieval.md"],
+                    "concepts/semantic-retrieval.md": ["concepts/vector-search.md"],
+                },
+            )
+
+            graph = json.loads(result.graph_path.read_text())
+            self.assertEqual(1, result.edge_count)
+            self.assertEqual("semantic_similarity", graph["edges"][0]["type"])
+
 
 if __name__ == "__main__":
     unittest.main()

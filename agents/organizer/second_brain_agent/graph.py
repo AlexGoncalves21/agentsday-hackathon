@@ -46,9 +46,10 @@ def build_graph_files(
     brain_dir: Path,
     previous_state: Dict[str, Any],
     generated_at: datetime,
+    planned_links: Dict[str, List[str]] | None = None,
 ) -> GraphBuildResult:
     nodes = _build_nodes(brain_dir, previous_state)
-    edges = _build_edges(brain_dir, nodes, previous_state)
+    edges = _build_edges(brain_dir, nodes, previous_state, planned_links)
     graph = _graph_payload(nodes, edges, generated_at)
     diff = _diff_payload(nodes, edges, previous_state, graph["build_id"], generated_at)
     state = _state_payload(nodes, edges, graph["build_id"], generated_at)
@@ -111,18 +112,26 @@ def _build_edges(
     brain_dir: Path,
     nodes: List[Dict[str, Any]],
     previous_state: Dict[str, Any],
+    planned_links: Dict[str, List[str]] | None = None,
 ) -> List[Dict[str, Any]]:
     node_ids = {node["id"] for node in nodes}
     previous_edges = previous_state.get("edges", {})
-    seen = set()
+    seen_pairs = set()
     edges = []
     for node_id in sorted(node_ids):
         source_path = brain_dir / node_id
-        for target_id, link_type in _extract_internal_links(source_path, brain_dir, node_ids):
-            edge_id = f"{node_id}->{target_id}"
-            if edge_id in seen:
+        if planned_links is None:
+            link_targets = _extract_internal_links(source_path, brain_dir, node_ids)
+        else:
+            link_targets = ((target_id, "semantic_similarity") for target_id in planned_links.get(node_id, []))
+        for target_id, link_type in link_targets:
+            if target_id not in node_ids or target_id == node_id:
                 continue
-            seen.add(edge_id)
+            edge_pair = tuple(sorted([node_id, target_id]))
+            if edge_pair in seen_pairs:
+                continue
+            seen_pairs.add(edge_pair)
+            edge_id = f"{node_id}->{target_id}"
             status = "unchanged" if edge_id in previous_edges else "new"
             edges.append(
                 {

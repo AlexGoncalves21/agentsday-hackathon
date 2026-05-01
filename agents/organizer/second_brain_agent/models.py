@@ -16,6 +16,9 @@ class PathsConfig:
 class ModelConfig:
     provider: str
     name: str
+    reasoning_effort: str = "high"
+    thinking_budget: int = 2048
+    temperature: float = 0.2
 
 
 @dataclass(frozen=True)

@@ -6,6 +6,7 @@ __pycache__/
 *.egg-info/
 node_modules/
 frontend/dist/
+input/
 .tmp/
 .test-tmp/
 .venv-stale-*/

@@ -247,6 +247,13 @@ button:disabled {
   stroke: none;
 }
 
+.graph-node .graph-node-mask {
+  fill: var(--surface);
+  opacity: 1;
+  pointer-events: none;
+  stroke: none;
+}
+
 .graph-node:hover circle,
 .graph-node-hovered circle,
 .graph-node-dragging circle {
@@ -257,7 +264,10 @@ button:disabled {
 
 .graph-node:hover .graph-node-hit,
 .graph-node-hovered .graph-node-hit,
-.graph-node-selected .graph-node-hit {
+.graph-node-selected .graph-node-hit,
+.graph-node:hover .graph-node-mask,
+.graph-node-hovered .graph-node-mask,
+.graph-node-selected .graph-node-mask {
   stroke: none;
 }
 

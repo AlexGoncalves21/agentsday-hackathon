@@ -608,6 +608,7 @@ export default function App() {
                       transform={`translate(${node.x} ${node.y})`}
                     >
                       <circle className="graph-node-hit" r={visualHitRadius} />
+                      <circle className="graph-node-mask" r={visualNodeRadius + 3 * graphUnitsPerPixel} />
                       <circle r={visualNodeRadius} fill={node.color} />
                       {node.type !== 'source' ? (
                         <text
@@ -684,7 +685,7 @@ export default function App() {
                 <div className="markdown-box markdown-box-error">{selectedMarkdownError}</div>
               ) : (
                 <div className="markdown-box markdown-rendered">
-                  {selectedMarkdown ? renderMarkdown(selectedMarkdown) : <p>Loading Markdown...</p>}
+                  {selectedMarkdown ? renderMarkdown(cleanMarkdownForDisplay(selectedMarkdown)) : <p>Loading Markdown...</p>}
                 </div>
               )}
             </>
@@ -834,6 +835,13 @@ function renderMarkdown(markdown) {
     }
     return <p key={index}>{renderInlineMarkdown(block.text)}</p>
   })
+}
+
+function cleanMarkdownForDisplay(markdown) {
+  return markdown
+    .replace(/^#{1,6}\s*(Source Trace|Related|Brain links that should probably exist later):?\s*\n[\s\S]*?(?=^#{1,6}\s+|(?![\s\S]))/gim, '')
+    .replace(/^Brain links that should probably exist later:\s*\n(?:^[ \t]*[-*].*(?:\n|$)|^[ \t]*\n)*/gim, '')
+    .trim()
 }
 
 function renderInlineMarkdown(text) {
@@ -1094,11 +1102,11 @@ function statusForEdge(edge, previousGraphState) {
 function stableLayout(rawNodes, rawEdges = []) {
   const communities = communitiesFor(rawNodes, rawEdges)
   const communityIds = [...new Set(rawNodes.map((node) => communities.get(node.id) || node.id))].sort()
+  const communityRadius = communityIds.length <= 1 ? 0 : Math.min(220, 76 + communityIds.length * 14)
   const communityCenterById = new Map(
     communityIds.map((communityId, index) => {
       const angle = (Math.PI * 2 * index) / Math.max(communityIds.length, 1)
-      const radius = communityIds.length <= 1 ? 0 : 455
-      return [communityId, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }]
+      return [communityId, { x: Math.cos(angle) * communityRadius, y: Math.sin(angle) * communityRadius }]
     }),
   )
 
@@ -1109,7 +1117,7 @@ function stableLayout(rawNodes, rawEdges = []) {
       const angle = hashToUnit(node.id) * Math.PI * 2
       const communityId = communities.get(node.id) || node.id
       const center = communityCenterById.get(communityId) || { x: 0, y: 0 }
-      const radius = 38 + 18 * Math.sqrt(index + 1)
+      const radius = 16 + 5.5 * Math.sqrt(index + 1)
       return {
         ...node,
         communityId,
@@ -1125,8 +1133,8 @@ function stableLayout(rawNodes, rawEdges = []) {
     .map((edge) => [indexById.get(edge.source), indexById.get(edge.target)])
     .filter(([source, target]) => Number.isInteger(source) && Number.isInteger(target) && source !== target)
 
-  const iterations = 300
-  const idealDistance = 78
+  const iterations = 340
+  const idealDistance = 42
 
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const cooling = 1 - iteration / iterations
@@ -1140,7 +1148,7 @@ function stableLayout(rawNodes, rawEdges = []) {
         const distanceSq = dx * dx + dy * dy
         const distance = Math.sqrt(distanceSq)
         const sameCommunity = left.communityId === right.communityId
-        const force = Math.min(10, (sameCommunity ? 880 : 3950) / distanceSq)
+        const force = Math.min(7, (sameCommunity ? 430 : 1180) / distanceSq)
         const fx = (dx / distance) * force
         const fy = (dy / distance) * force
         left.vx -= fx
@@ -1156,8 +1164,7 @@ function stableLayout(rawNodes, rawEdges = []) {
       const dx = target.x - source.x
       const dy = target.y - source.y
       const distance = Math.sqrt(dx * dx + dy * dy) || 1
-      const targetDistance = source.communityId === target.communityId ? idealDistance : idealDistance * 2.85
-      const force = (distance - targetDistance) * 0.041
+      const force = (distance - idealDistance) * 0.092
       const fx = (dx / distance) * force
       const fy = (dy / distance) * force
       source.vx += fx
@@ -1168,12 +1175,12 @@ function stableLayout(rawNodes, rawEdges = []) {
 
     for (const node of nodes) {
       const center = communityCenterById.get(node.communityId) || { x: 0, y: 0 }
-      node.vx += (center.x - node.x) * 0.014
-      node.vy += (center.y - node.y) * 0.014
-      node.vx += -node.x * 0.0008
-      node.vy += -node.y * 0.0008
-      node.x += node.vx * 0.18 * cooling
-      node.y += node.vy * 0.18 * cooling
+      node.vx += (center.x - node.x) * 0.013
+      node.vy += (center.y - node.y) * 0.013
+      node.vx += -node.x * 0.0014
+      node.vy += -node.y * 0.0014
+      node.x += node.vx * 0.2 * cooling
+      node.y += node.vy * 0.2 * cooling
       node.vx *= 0.58
       node.vy *= 0.58
     }
@@ -1188,24 +1195,7 @@ function stableLayout(rawNodes, rawEdges = []) {
 
 function communitiesFor(rawNodes, rawEdges) {
   const nodeIds = rawNodes.map((node) => node.id).sort()
-  const degree = new Map(nodeIds.map((id) => [id, 0]))
-  for (const edge of rawEdges) {
-    degree.set(edge.source, (degree.get(edge.source) || 0) + 1)
-    degree.set(edge.target, (degree.get(edge.target) || 0) + 1)
-  }
-
-  const hubDegree = Math.max(6, Math.ceil(Math.sqrt(nodeIds.length) * 1.35))
-  const reducedAdjacency = new Map(nodeIds.map((id) => [id, new Set()]))
   const fullAdjacency = adjacencyFor(rawNodes, rawEdges)
-
-  for (const edge of rawEdges) {
-    const sourceIsHub = (degree.get(edge.source) || 0) >= hubDegree
-    const targetIsHub = (degree.get(edge.target) || 0) >= hubDegree
-    if (sourceIsHub || targetIsHub) continue
-    reducedAdjacency.get(edge.source)?.add(edge.target)
-    reducedAdjacency.get(edge.target)?.add(edge.source)
-  }
-
   const communityById = new Map()
   const visited = new Set()
 
@@ -1218,7 +1208,7 @@ function communitiesFor(rawNodes, rawEdges) {
     while (stack.length) {
       const current = stack.pop()
       component.push(current)
-      for (const neighbor of reducedAdjacency.get(current) || []) {
+      for (const neighbor of fullAdjacency.get(current) || []) {
         if (visited.has(neighbor)) continue
         visited.add(neighbor)
         stack.push(neighbor)
@@ -1230,29 +1220,7 @@ function communitiesFor(rawNodes, rawEdges) {
       communityById.set(componentId, communityId)
     }
   }
-
-  for (const id of nodeIds) {
-    const ownCommunity = communityById.get(id)
-    const neighborCommunities = [...(fullAdjacency.get(id) || [])]
-      .map((neighbor) => communityById.get(neighbor))
-      .filter(Boolean)
-      .filter((communityId) => communityId !== ownCommunity)
-
-    if (!neighborCommunities.length) continue
-    if ((degree.get(id) || 0) >= hubDegree || reducedAdjacency.get(id)?.size === 0) {
-      communityById.set(id, mostCommon(neighborCommunities))
-    }
-  }
-
   return communityById
-}
-
-function mostCommon(values) {
-  const counts = values.reduce((nextCounts, value) => {
-    nextCounts.set(value, (nextCounts.get(value) || 0) + 1)
-    return nextCounts
-  }, new Map())
-  return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0]
 }
 
 function adjacencyFor(rawNodes, rawEdges) {

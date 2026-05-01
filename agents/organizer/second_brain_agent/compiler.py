@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -11,8 +12,19 @@ from .graph import GraphBuildResult, build_graph_files, load_previous_state
 from .markdown import markdown_list, parse_input_document, relative_markdown_link, slugify
 from .models import AgentConfig, BrainPage, ExistingBrainPage, InputDocument, PromptConfig, QualityCheck
 from .quality import evaluate_brain
+from .reasoning import OrganizerReasoner
 from .taxonomy import CATEGORIES, category_for, group_by_category, related_slugs_for
 from .trace import TraceRecorder
+
+MIN_LOOP_ITERATIONS = 2
+MAX_RELATED_SLUGS = 6
+GENERATED_MARKDOWN_SECTION_RE = re.compile(
+    r"(?ms)^#{1,6}\s*(?:Source Trace|Related|Brain links that should probably exist later):?\s*\n.*?(?=^#{1,6}\s+|\Z)"
+)
+BRAIN_LINKS_BLOCK_RE = re.compile(
+    r"(?ms)^Brain links that should probably exist later:\s*\n(?:^[ \t]*[-*].*(?:\n|$)|^[ \t]*\n)*"
+)
+SEMANTIC_IGNORED_SECTION_RE = re.compile(r"(?ms)^#{1,6}\s*(?:Sources|Source URLs)\s*\n.*?(?=^#{1,6}\s+|\Z)")
 
 
 @dataclass(frozen=True)
@@ -23,14 +35,23 @@ class CompileResult:
     graph_result: GraphBuildResult
     quality_checks: List[QualityCheck]
     report_path: Path
+    iterations_run: int
+    stabilized: bool
 
 
 class WikiCompiler:
-    def __init__(self, config: AgentConfig, prompts: PromptConfig, workspace: Path) -> None:
+    def __init__(
+        self,
+        config: AgentConfig,
+        prompts: PromptConfig,
+        workspace: Path,
+        reasoner: OrganizerReasoner | None = None,
+    ) -> None:
         self.config = config
         self.prompts = prompts
         self.workspace = workspace
         self.trace = TraceRecorder(config.paths.runs_dir)
+        self.reasoner = reasoner
 
     @classmethod
     def from_files(
@@ -38,12 +59,12 @@ class WikiCompiler:
         config_path: Path,
         prompt_path: Path,
         workspace: Path,
+        enable_reasoning: bool = False,
     ) -> "WikiCompiler":
-        return cls(
-            config=load_agent_config(config_path, workspace),
-            prompts=load_prompt_config(prompt_path),
-            workspace=workspace,
-        )
+        config = load_agent_config(config_path, workspace)
+        prompts = load_prompt_config(prompt_path)
+        reasoner = OrganizerReasoner(config, prompts) if enable_reasoning else None
+        return cls(config=config, prompts=prompts, workspace=workspace, reasoner=reasoner)
 
     def run(self) -> CompileResult:
         self.trace.reset()
@@ -52,7 +73,7 @@ class WikiCompiler:
         docs = self._load_inputs()
         self._prepare_output_dirs()
         existing_pages = self._existing_brain_pages()
-        pages = self._plan_pages(docs, existing_pages)
+        pages, iterations_run, stabilized = self._run_planning_loop(docs, existing_pages)
         self._write_brain_pages(pages)
         self._write_source_pages(pages)
         self._write_base_files(docs)
@@ -63,7 +84,7 @@ class WikiCompiler:
         quality_checks = evaluate_brain(self.config.paths.brain_dir, docs, pages)
         for check in quality_checks:
             self.trace.subagent("critic", f"{check.name}: {'passed' if check.passed else 'failed'} - {check.details}")
-        report_path = self._write_run_reports(docs, pages, graph_result, quality_checks)
+        report_path = self._write_run_reports(docs, pages, graph_result, quality_checks, iterations_run, stabilized)
         self.trace.subagent("archivist", f"Wrote run report to {self._repo_rel(report_path)}.")
         self._delete_processed_inputs(docs)
         self.trace.flush_subagents()
@@ -75,6 +96,8 @@ class WikiCompiler:
             graph_result=graph_result,
             quality_checks=quality_checks,
             report_path=report_path,
+            iterations_run=iterations_run,
+            stabilized=stabilized,
         )
 
     def _load_inputs(self) -> List[InputDocument]:
@@ -127,14 +150,61 @@ class WikiCompiler:
             deleted.append(self._repo_rel(input_path))
         self.trace.subagent("archivist", f"Deleted {len(deleted)} processed input file(s): {', '.join(deleted)}.")
 
+    def _run_planning_loop(
+        self,
+        docs: List[InputDocument],
+        existing_pages: Dict[str, ExistingBrainPage],
+    ) -> tuple[Dict[str, BrainPage], int, bool]:
+        max_iterations = max(1, self.config.loop.max_iterations)
+        min_iterations = min(max_iterations, MIN_LOOP_ITERATIONS)
+        pages: Dict[str, BrainPage] = {}
+        stabilized = False
+        iterations_run = 0
+
+        for iteration in range(1, max_iterations + 1):
+            iterations_run = iteration
+            self.trace.event(
+                "loop",
+                "Starting Organizer planning loop iteration",
+                iteration=iteration,
+                max_iterations=max_iterations,
+            )
+            if not pages:
+                pages = self._plan_pages(docs, existing_pages)
+
+            critique = self._critique_page_plan(docs, pages, existing_pages)
+            if critique:
+                self.trace.subagent("critic", f"Iteration {iteration}: requested fixes: {'; '.join(critique)}.")
+            else:
+                self.trace.subagent("critic", f"Iteration {iteration}: page plan passed critique.")
+            if self.reasoner:
+                model_critique = self.reasoner.critique_page_plan(iteration, docs, pages, critique)
+                self.trace.subagent("critic", f"Iteration {iteration} model critique: {model_critique}")
+
+            improved_pages, changes = self._improve_page_plan(pages, existing_pages)
+            if changes:
+                self.trace.subagent("synthesizer", f"Iteration {iteration}: refined page plan: {'; '.join(changes)}.")
+            else:
+                self.trace.subagent("synthesizer", f"Iteration {iteration}: no page-plan refinements needed.")
+
+            pages = improved_pages
+            if not critique and not changes and iteration >= min_iterations:
+                stabilized = True
+                self.trace.event("loop", "Organizer planning loop stabilized", iteration=iteration)
+                break
+
+        if not stabilized:
+            self.trace.event("loop", "Organizer planning loop reached max iterations", iterations=iterations_run)
+        return pages, iterations_run, stabilized
+
     def _plan_pages(self, docs: List[InputDocument], existing_pages: Dict[str, ExistingBrainPage]) -> Dict[str, BrainPage]:
         pages: Dict[str, BrainPage] = {}
-        curated_docs = [self._curate_document(doc) for doc in docs]
+        curated_docs = [self._semantic_input_document(self._curate_document(doc)) for doc in docs]
         relation_docs = curated_docs + [
             InputDocument(
                 path=page.path,
                 title=page.title,
-                information=self._markdown_text(page.path),
+                information=self._semantic_note_text(self._markdown_text(page.path)),
                 sources=[],
                 slug=page.slug,
             )
@@ -157,11 +227,80 @@ class WikiCompiler:
             )
         return pages
 
+    def _critique_page_plan(
+        self,
+        docs: List[InputDocument],
+        pages: Dict[str, BrainPage],
+        existing_pages: Dict[str, ExistingBrainPage],
+    ) -> List[str]:
+        issues = []
+        represented_inputs = {page.source_doc.path.resolve() for page in pages.values()}
+        missing_inputs = [doc.path.name for doc in docs if doc.path.resolve() not in represented_inputs]
+        if missing_inputs:
+            issues.append(f"missing compiled pages for {', '.join(missing_inputs)}")
+
+        available_slugs = set(pages) | set(existing_pages)
+        for page in pages.values():
+            if page.slug in page.related_slugs:
+                issues.append(f"`{page.slug}` links to itself")
+            unknown = [slug for slug in page.related_slugs if slug not in available_slugs]
+            if unknown:
+                issues.append(f"`{page.slug}` links to unavailable pages: {', '.join(unknown)}")
+            if len(page.related_slugs) > MAX_RELATED_SLUGS:
+                issues.append(f"`{page.slug}` has too many related links")
+
+        for page in pages.values():
+            for related_slug in page.related_slugs:
+                related = pages.get(related_slug)
+                if related and page.slug not in related.related_slugs:
+                    issues.append(f"`{page.slug}` and `{related_slug}` need reciprocal related links")
+        return issues
+
+    def _improve_page_plan(
+        self,
+        pages: Dict[str, BrainPage],
+        existing_pages: Dict[str, ExistingBrainPage],
+    ) -> tuple[Dict[str, BrainPage], List[str]]:
+        available_slugs = set(pages) | set(existing_pages)
+        related_by_slug = {
+            slug: self._clean_related_slugs(page.related_slugs, slug, available_slugs) for slug, page in pages.items()
+        }
+        changes = []
+
+        for slug, related_slugs in list(related_by_slug.items()):
+            for related_slug in list(related_slugs):
+                if related_slug not in pages:
+                    continue
+                reciprocal = related_by_slug.setdefault(related_slug, [])
+                if slug not in reciprocal and len(reciprocal) < MAX_RELATED_SLUGS:
+                    reciprocal.append(slug)
+
+        improved_pages = {}
+        for slug, page in pages.items():
+            related_slugs = related_by_slug.get(slug, [])[:MAX_RELATED_SLUGS]
+            if related_slugs != page.related_slugs:
+                changes.append(f"`{slug}` related links normalized")
+            improved_pages[slug] = replace(page, related_slugs=related_slugs)
+        return improved_pages, changes
+
+    def _clean_related_slugs(self, related_slugs: List[str], page_slug: str, available_slugs: set[str]) -> List[str]:
+        clean = []
+        for related_slug in related_slugs:
+            if related_slug == page_slug or related_slug not in available_slugs or related_slug in clean:
+                continue
+            clean.append(related_slug)
+            if len(clean) == MAX_RELATED_SLUGS:
+                break
+        return clean
+
     def _curate_document(self, doc: InputDocument) -> InputDocument:
         title = self._curated_title(doc)
         if title == doc.title:
             return doc
         return replace(doc, title=title, slug=slugify(title))
+
+    def _semantic_input_document(self, doc: InputDocument) -> InputDocument:
+        return replace(doc, information=self._clean_note_information(doc.information))
 
     def _curated_title(self, doc: InputDocument) -> str:
         lowered_title = doc.title.lower()
@@ -219,8 +358,7 @@ Each compiled page should contain:
 
 - A short title.
 - Dense, source-backed information.
-- Links to the source summary page and original URLs.
-- Related pages when useful.
+- Source URLs when available.
 
 Core folders:
 
@@ -279,6 +417,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             self.config.paths.brain_dir,
             previous_graph_state,
             datetime.now().astimezone(),
+            self._semantic_graph_links(),
         )
         self.trace.subagent(
             "archivist",
@@ -297,7 +436,9 @@ Uncertain claims should stay visible and should be carried into `open_questions.
         for doc in docs:
             lowered = doc.information.lower()
             if "uncertain" in lowered or "likely" in lowered or "could" in lowered:
-                page = pages[doc.slug]
+                page = next((candidate for candidate in pages.values() if candidate.source_doc.path == doc.path), None)
+                if not page:
+                    continue
                 link = relative_markdown_link(self.config.paths.brain_dir / "open_questions.md", page.path, page.title)
                 questions.append(f"- Review uncertainty in {link}.")
         if not questions:
@@ -332,27 +473,18 @@ Uncertain claims should stay visible and should be carried into `open_questions.
     def _write_brain_pages(self, pages: Dict[str, BrainPage]) -> None:
         for page in pages.values():
             doc = page.source_doc
-            source_page = self.config.paths.brain_dir / "sources" / doc.path.name
-            source_summary_link = relative_markdown_link(page.path, source_page, "source summary")
-            related_links = self._related_links(page, pages)
+            information = self._clean_note_information(doc.information)
             lines = [
                 f"# {page.title}",
                 "",
                 "## Information",
                 "",
-                doc.information,
-                "",
-                "## Source Trace",
-                "",
-                f"- Original input file: `{doc.path.name}`",
-                f"- Source summary: {source_summary_link}",
+                information,
                 "",
                 "## Sources",
                 "",
                 markdown_list(doc.sources),
             ]
-            if related_links:
-                lines.extend(["", "## Related", "", markdown_list(related_links)])
             self._write(page.path, "\n".join(lines) + "\n")
             self.trace.subagent(
                 "synthesizer",
@@ -385,12 +517,59 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             self._write(source_path, content)
             self.trace.subagent("archivist", f"Wrote source summary `{self._repo_rel(source_path)}`.")
 
+    def _semantic_graph_links(self) -> Dict[str, List[str]]:
+        documents = self._graph_documents()
+        rel_by_slug = {document.slug: self._brain_rel(document.path) for document in documents}
+        planned_links: Dict[str, List[str]] = {}
+        for document in documents:
+            source_rel = rel_by_slug[document.slug]
+            planned_links[source_rel] = [
+                rel_by_slug[related_slug]
+                for related_slug in related_slugs_for(document, documents)
+                if related_slug in rel_by_slug
+            ]
+        self.trace.subagent(
+            "critic",
+            f"Built semantic graph links from TF-IDF note overlap across {len(documents)} compiled page(s).",
+        )
+        return planned_links
+
+    def _graph_documents(self) -> List[InputDocument]:
+        documents = []
+        for category in ["topics", "concepts", "people", "companies", "projects", "events", "works"]:
+            for path in self._category_pages(category):
+                documents.append(
+                    InputDocument(
+                        path=path,
+                        title=self._markdown_title(path),
+                        information=self._semantic_note_text(self._markdown_text(path)),
+                        sources=[],
+                        slug=path.stem,
+                    )
+                )
+        return documents
+
+    def _brain_rel(self, path: Path) -> str:
+        return path.resolve().relative_to(self.config.paths.brain_dir.resolve()).as_posix()
+
+    def _clean_note_information(self, text: str) -> str:
+        cleaned = GENERATED_MARKDOWN_SECTION_RE.sub("", text)
+        cleaned = BRAIN_LINKS_BLOCK_RE.sub("", cleaned)
+        return cleaned.strip()
+
+    def _semantic_note_text(self, text: str) -> str:
+        cleaned = self._clean_note_information(text)
+        cleaned = SEMANTIC_IGNORED_SECTION_RE.sub("", cleaned)
+        return cleaned.strip()
+
     def _write_run_reports(
         self,
         docs: List[InputDocument],
         pages: Dict[str, BrainPage],
         graph_result: GraphBuildResult,
         quality_checks: List[QualityCheck],
+        iterations_run: int,
+        stabilized: bool,
     ) -> Path:
         now = datetime.now().astimezone()
         latest = self.config.paths.runs_dir / "latest_report.md"
@@ -416,6 +595,11 @@ Mode: `{self.config.mode}`
 ## Quality Checks
 
 {checks}
+
+## Organizer Loop
+
+- Iterations run: {iterations_run}
+- Stabilized: {'yes' if stabilized else 'no'}
 
 ## Index
 

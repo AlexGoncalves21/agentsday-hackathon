@@ -9,6 +9,8 @@ from uuid import uuid4
 
 from agents.organizer.second_brain_agent.compiler import WikiCompiler
 from agents.organizer.second_brain_agent.markdown import parse_input_document
+from agents.organizer.second_brain_agent.models import InputDocument
+from agents.organizer.second_brain_agent.taxonomy import related_slugs_for
 
 
 class InputParserTests(unittest.TestCase):
@@ -147,6 +149,69 @@ model:
             self.assertIn("AI Is No UI", labels)
             self.assertNotIn("X Post by naval: The promise of AI is no UI.", labels)
 
+    def test_compiler_runs_closed_critic_loop_before_writing_final_brain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            input_dir = workspace / "input"
+            brain_dir = workspace / "brain"
+            runs_dir = workspace / "runs"
+            input_dir.mkdir()
+            brain_dir.mkdir()
+            (input_dir / "vector-search.md").write_text(
+                """# Vector Search
+
+## Information
+
+Vector embeddings power semantic retrieval. Embeddings encode meaning for retrieval systems.
+
+## Sources
+
+- https://example.com/vector
+"""
+            )
+            (input_dir / "semantic-retrieval.md").write_text(
+                """# Semantic Retrieval
+
+## Information
+
+Semantic retrieval ranks documents using vector embeddings and query similarity.
+
+## Sources
+
+- https://example.com/retrieval
+"""
+            )
+            config_path = workspace / "config.yaml"
+            config_path.write_text(
+                """mode: scan
+
+paths:
+  input_dir: input
+  brain_dir: brain
+  runs_dir: runs
+
+loop:
+  max_iterations: 3
+
+model:
+  provider: gemini
+  name: gemini-3-flash-preview
+"""
+            )
+            prompt_path = workspace / "prompts.yaml"
+            prompt_path.write_text("system: ''\n")
+
+            result = WikiCompiler.from_files(config_path, prompt_path, workspace).run()
+
+            self.assertGreaterEqual(result.iterations_run, 2)
+            self.assertTrue(result.stabilized)
+            critic_trace = (runs_dir / "subagents" / "critic.md").read_text()
+            self.assertIn("Iteration 1:", critic_trace)
+            self.assertIn("Iteration 2:", critic_trace)
+            report = (runs_dir / "latest_report.md").read_text()
+            self.assertIn("## Organizer Loop", report)
+            self.assertIn("- Iterations run: 2", report)
+
     def test_scan_mode_links_new_pages_to_existing_brain_context(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp)
@@ -194,7 +259,8 @@ model:
             WikiCompiler.from_files(config_path, prompt_path, workspace).run()
 
             new_page = brain_dir / "concepts" / "ai-is-no-ui.md"
-            self.assertIn("intelligence-vs-agency.md", new_page.read_text())
+            self.assertNotIn("## Related", new_page.read_text())
+            self.assertNotIn("## Source Trace", new_page.read_text())
             self.assertFalse((input_dir / "naval.md").exists())
             graph = json.loads((brain_dir / "graph.json").read_text())
             edge_pairs = {(edge["source"], edge["target"]) for edge in graph["edges"]}
@@ -254,6 +320,33 @@ model:
             self.assertNotIn("## Related", roman_page.read_text())
             graph = json.loads((brain_dir / "graph.json").read_text())
             self.assertFalse(any(edge["source"] == "concepts/roman-empire.md" for edge in graph["edges"]))
+
+    def test_related_slugs_use_shared_tfidf_terms(self) -> None:
+        documents = [
+            InputDocument(
+                path=Path("vector-search.md"),
+                title="Vector Search",
+                information="Vector embeddings power semantic retrieval. Embeddings encode meaning for retrieval systems.",
+                sources=[],
+                slug="vector-search",
+            ),
+            InputDocument(
+                path=Path("semantic-retrieval.md"),
+                title="Semantic Retrieval",
+                information="Semantic retrieval ranks documents using vector embeddings and query similarity.",
+                sources=[],
+                slug="semantic-retrieval",
+            ),
+            InputDocument(
+                path=Path("roman-roads.md"),
+                title="Roman Roads",
+                information="Ancient roads, military logistics, stone construction, and imperial administration.",
+                sources=[],
+                slug="roman-roads",
+            ),
+        ]
+
+        self.assertEqual(["semantic-retrieval"], related_slugs_for(documents[0], documents))
 
     def test_failed_input_parse_does_not_delete_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

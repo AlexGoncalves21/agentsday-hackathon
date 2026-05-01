@@ -26,7 +26,8 @@ def _check_all_inputs_represented(
     docs: List[InputDocument],
     pages_by_slug: Dict[str, BrainPage],
 ) -> QualityCheck:
-    missing = [doc.title for doc in docs if doc.slug not in pages_by_slug]
+    represented_input_paths = {page.source_doc.path.resolve() for page in pages_by_slug.values()}
+    missing = [doc.title for doc in docs if doc.path.resolve() not in represented_input_paths]
     return QualityCheck(
         name="Every input represented",
         passed=not missing,

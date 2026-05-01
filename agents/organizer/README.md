@@ -17,7 +17,7 @@ Check available Gemini models for the current `GEMINI_API_KEY`:
 python3 -m agents.organizer.second_brain_agent list-models
 ```
 
-The deterministic Organizer path works with the local Python used during development. The LLM-backed Deep Agents path requires Python 3.11+ because the `deepagents` package requires Python 3.11 or newer.
+Organizer runs use the LLM-backed reasoning critic by default. Use a Python 3.11+ environment with the project dependencies installed (`python3 -m pip install -e .`) and LangSmith/Gemini environment variables set. For local tests or offline debugging, pass `--deterministic` to skip model reasoning.
 
 Observe the run:
 
@@ -27,6 +27,6 @@ Observe the run:
 - `brain/index.md` is generated at the end and links the compiled Markdown set.
 - `brain/graph.json` and `brain/graph_diff.json` are generated deterministically after Markdown writing finishes.
 
-The deterministic compiler does not expose hidden model reasoning. It records observable decisions and outputs so the run can be debugged without relying on private chain-of-thought.
+The compiler does not expose hidden model reasoning. It records observable decisions and model critique summaries so the run can be debugged without relying on private chain-of-thought. LangSmith traces are emitted for the model-backed critic when tracing is enabled.
 
-Graph generation lives in `agents/organizer/second_brain_agent/graph.py`. It creates one node per Markdown file, extracts internal Markdown and wiki-style links, and records new or changed nodes by comparing the current graph to the previous graph state.
+Graph generation lives in `agents/organizer/second_brain_agent/graph.py`. The Organizer passes semantic TF-IDF links to it so compiled notes can stay free of generated `Related` sections, and the graph records new or changed nodes by comparing the current graph to the previous graph state.
