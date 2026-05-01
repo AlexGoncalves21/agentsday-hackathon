@@ -42,7 +42,7 @@ function nodeColor(node, isSeen) {
 
 function linkColor(link, isSeen) {
   const status = displayStatus(link.status, isSeen)
-  return status === 'new' ? '#58b99f' : 'rgba(49, 87, 107, 0.18)'
+  return status === 'new' ? '#24997f' : 'rgba(49, 87, 107, 0.46)'
 }
 
 function labelPlacementsFor(nodes, unitsPerPixel, visibleIds) {
@@ -239,6 +239,10 @@ export default function App() {
     return Object.fromEntries(renderedNodes.map((node, index) => [node.id, index]))
   }, [renderedNodes])
 
+  const nodesById = useMemo(() => {
+    return Object.fromEntries(renderedNodes.map((node) => [node.id, node]))
+  }, [renderedNodes])
+
   const adjacency = useMemo(() => {
     return graph ? adjacencyFor(graph.nodes, graph.edges) : new Map()
   }, [graph])
@@ -253,7 +257,7 @@ export default function App() {
         sourceIndex: nodeIndexesById[edge.source],
         targetIndex: nodeIndexesById[edge.target],
         color: linkColor({ ...edge, status }, statusIsSeen),
-        width: status === 'new' && !statusIsSeen ? (evolutionMode ? 3.2 : 1.45) : 0.65,
+        width: status === 'new' && !statusIsSeen ? (evolutionMode ? 3.8 : 2.15) : 1.35,
       }
     })
   }, [evolutionMode, graph, nodeIndexesById, previousGraphState, statusIsSeen])
@@ -686,6 +690,7 @@ export default function App() {
               ) : (
                 <div className="markdown-box markdown-rendered">
                   {selectedMarkdown ? renderMarkdown(cleanMarkdownForDisplay(selectedMarkdown)) : <p>Loading Markdown...</p>}
+                  <ConnectionReasons selected={selected} links={links} nodesById={nodesById} />
                 </div>
               )}
             </>
@@ -711,6 +716,16 @@ function LinkDetails({ link, source, target, onPickNode, statusIsSeen }) {
         </span>
       </div>
       <div className="category-line">{link.type.replace(/_/g, ' ')}</div>
+      {link.shared_terms?.length ? (
+        <div className="connection-terms">
+          <span>Shared words</span>
+          <div>
+            {link.shared_terms.map((term) => (
+              <code key={term}>{term}</code>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="link-detail">
         <button type="button" onClick={() => source && onPickNode(source)} disabled={!source}>
           <span className="link-detail-label">From</span>
@@ -725,6 +740,36 @@ function LinkDetails({ link, source, target, onPickNode, statusIsSeen }) {
         </button>
       </div>
     </>
+  )
+}
+
+function ConnectionReasons({ selected, links, nodesById }) {
+  if (!selected) return null
+  const relatedLinks = links
+    .filter((link) => link.source === selected.id || link.target === selected.id)
+    .filter((link) => link.shared_terms?.length)
+    .sort((left, right) => (right.score || 0) - (left.score || 0))
+
+  if (!relatedLinks.length) return null
+
+  return (
+    <section className="connection-reasons">
+      <h3>Why These Links Exist</h3>
+      {relatedLinks.map((link) => {
+        const otherId = link.source === selected.id ? link.target : link.source
+        const otherNode = nodesById[otherId]
+        return (
+          <div className="connection-reason" key={link.id}>
+            <strong>{otherNode?.label || otherId}</strong>
+            <div>
+              {link.shared_terms.map((term) => (
+                <code key={term}>{term}</code>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </section>
   )
 }
 
@@ -1117,7 +1162,7 @@ function stableLayout(rawNodes, rawEdges = []) {
       const angle = hashToUnit(node.id) * Math.PI * 2
       const communityId = communities.get(node.id) || node.id
       const center = communityCenterById.get(communityId) || { x: 0, y: 0 }
-      const radius = 16 + 5.5 * Math.sqrt(index + 1)
+      const radius = 24 + 8 * Math.sqrt(index + 1)
       return {
         ...node,
         communityId,
@@ -1133,8 +1178,8 @@ function stableLayout(rawNodes, rawEdges = []) {
     .map((edge) => [indexById.get(edge.source), indexById.get(edge.target)])
     .filter(([source, target]) => Number.isInteger(source) && Number.isInteger(target) && source !== target)
 
-  const iterations = 340
-  const idealDistance = 42
+  const iterations = 380
+  const idealDistance = 58
 
   for (let iteration = 0; iteration < iterations; iteration += 1) {
     const cooling = 1 - iteration / iterations
@@ -1148,7 +1193,7 @@ function stableLayout(rawNodes, rawEdges = []) {
         const distanceSq = dx * dx + dy * dy
         const distance = Math.sqrt(distanceSq)
         const sameCommunity = left.communityId === right.communityId
-        const force = Math.min(7, (sameCommunity ? 430 : 1180) / distanceSq)
+        const force = Math.min(9, (sameCommunity ? 820 : 1500) / distanceSq)
         const fx = (dx / distance) * force
         const fy = (dy / distance) * force
         left.vx -= fx
@@ -1175,8 +1220,8 @@ function stableLayout(rawNodes, rawEdges = []) {
 
     for (const node of nodes) {
       const center = communityCenterById.get(node.communityId) || { x: 0, y: 0 }
-      node.vx += (center.x - node.x) * 0.013
-      node.vy += (center.y - node.y) * 0.013
+      node.vx += (center.x - node.x) * 0.009
+      node.vy += (center.y - node.y) * 0.009
       node.vx += -node.x * 0.0014
       node.vy += -node.y * 0.0014
       node.x += node.vx * 0.2 * cooling

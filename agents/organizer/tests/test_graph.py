@@ -46,14 +46,28 @@ class GraphBuilderTests(unittest.TestCase):
                 {"nodes": {}, "edges": {}},
                 datetime.now(timezone.utc),
                 {
-                    "concepts/vector-search.md": ["concepts/semantic-retrieval.md"],
-                    "concepts/semantic-retrieval.md": ["concepts/vector-search.md"],
+                    "concepts/vector-search.md": [
+                        {
+                            "target": "concepts/semantic-retrieval.md",
+                            "shared_terms": ["embedding", "retrieval"],
+                            "score": 3.42,
+                        }
+                    ],
+                    "concepts/semantic-retrieval.md": [
+                        {
+                            "target": "concepts/vector-search.md",
+                            "shared_terms": ["embedding", "retrieval"],
+                            "score": 3.42,
+                        }
+                    ],
                 },
             )
 
             graph = json.loads(result.graph_path.read_text())
             self.assertEqual(1, result.edge_count)
             self.assertEqual("semantic_similarity", graph["edges"][0]["type"])
+            self.assertEqual(["embedding", "retrieval"], graph["edges"][0]["shared_terms"])
+            self.assertEqual(3.42, graph["edges"][0]["score"])
 
 
 if __name__ == "__main__":

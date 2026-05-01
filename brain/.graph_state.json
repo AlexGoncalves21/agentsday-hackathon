@@ -1,0 +1,74 @@
+{
+  "build_id": "ec8c4d99ab38b15d",
+  "edges": {
+    "companies/multiverse-computing.md->people/demis-hassabis.md": {
+      "hash": "b3189991c177d8dc"
+    },
+    "concepts/conways-game-of-life.md->concepts/fibonacci.md": {
+      "hash": "1b2f8c73a3c833d8"
+    },
+    "concepts/conways-game-of-life.md->concepts/game-theory.md": {
+      "hash": "f9c7c7c80c83addd"
+    },
+    "concepts/decision-theory.md->concepts/game-theory.md": {
+      "hash": "afbbff5636407d46"
+    },
+    "concepts/decision-theory.md->concepts/intelligence-vs-agency.md": {
+      "hash": "9398e3f400bba6b7"
+    },
+    "concepts/decision-theory.md->topics/agent-frameworks-and-elixir-otp.md": {
+      "hash": "21a0ec01950495a8"
+    },
+    "concepts/lei-de-murphy.md->topics/agent-frameworks-and-elixir-otp.md": {
+      "hash": "1793607c987281da"
+    }
+  },
+  "generated_at": "2026-05-01T16:10:57+01:00",
+  "nodes": {
+    "companies/multiverse-computing.md": {
+      "hash": "a9cea97c4b6abfbd"
+    },
+    "concepts/conways-game-of-life.md": {
+      "hash": "e5116e24c21e5f59"
+    },
+    "concepts/decision-theory.md": {
+      "hash": "2d87486234ebb508"
+    },
+    "concepts/design-patterns.md": {
+      "hash": "c35550a5ed183b6f"
+    },
+    "concepts/fibonacci.md": {
+      "hash": "be5c015fd0fc18fd"
+    },
+    "concepts/game-theory.md": {
+      "hash": "84513d8e250fdc20"
+    },
+    "concepts/intelligence-vs-agency.md": {
+      "hash": "6cda2e3c5be6f18a"
+    },
+    "concepts/lei-de-murphy.md": {
+      "hash": "86e93791f4d774eb"
+    },
+    "concepts/monte-carlo-and-markov-chains.md": {
+      "hash": "097036f4c8eab2ea"
+    },
+    "concepts/self-hosting.md": {
+      "hash": "67ac69383aaf295f"
+    },
+    "concepts/tatica-do-quadrado.md": {
+      "hash": "2214aadf88926587"
+    },
+    "events/batalha-de-aljubarrota.md": {
+      "hash": "2d23bfcf284fb790"
+    },
+    "people/demis-hassabis.md": {
+      "hash": "ed6d8eb9705227e2"
+    },
+    "topics/agent-frameworks-and-elixir-otp.md": {
+      "hash": "0e6effe7e65ac1fe"
+    },
+    "works/all-tomorrows.md": {
+      "hash": "d59daf1ac2433729"
+    }
+  }
+}

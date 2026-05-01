@@ -46,7 +46,7 @@ def build_graph_files(
     brain_dir: Path,
     previous_state: Dict[str, Any],
     generated_at: datetime,
-    planned_links: Dict[str, List[str]] | None = None,
+    planned_links: Dict[str, List[Any]] | None = None,
 ) -> GraphBuildResult:
     nodes = _build_nodes(brain_dir, previous_state)
     edges = _build_edges(brain_dir, nodes, previous_state, planned_links)
@@ -112,7 +112,7 @@ def _build_edges(
     brain_dir: Path,
     nodes: List[Dict[str, Any]],
     previous_state: Dict[str, Any],
-    planned_links: Dict[str, List[str]] | None = None,
+    planned_links: Dict[str, List[Any]] | None = None,
 ) -> List[Dict[str, Any]]:
     node_ids = {node["id"] for node in nodes}
     previous_edges = previous_state.get("edges", {})
@@ -121,10 +121,14 @@ def _build_edges(
     for node_id in sorted(node_ids):
         source_path = brain_dir / node_id
         if planned_links is None:
-            link_targets = _extract_internal_links(source_path, brain_dir, node_ids)
+            link_targets = (
+                {"target": target_id, "type": link_type, "shared_terms": [], "score": None}
+                for target_id, link_type in _extract_internal_links(source_path, brain_dir, node_ids)
+            )
         else:
-            link_targets = ((target_id, "semantic_similarity") for target_id in planned_links.get(node_id, []))
-        for target_id, link_type in link_targets:
+            link_targets = (_normalize_planned_link(link) for link in planned_links.get(node_id, []))
+        for link in link_targets:
+            target_id = link["target"]
             if target_id not in node_ids or target_id == node_id:
                 continue
             edge_pair = tuple(sorted([node_id, target_id]))
@@ -133,17 +137,32 @@ def _build_edges(
             seen_pairs.add(edge_pair)
             edge_id = f"{node_id}->{target_id}"
             status = "unchanged" if edge_id in previous_edges else "new"
+            shared_terms = link.get("shared_terms", [])
+            score = link.get("score")
             edges.append(
                 {
                     "id": edge_id,
                     "source": node_id,
                     "target": target_id,
-                    "type": link_type,
+                    "type": link["type"],
                     "status": status,
-                    "hash": _hash_text(edge_id),
+                    "hash": _hash_text(json.dumps([edge_id, shared_terms, score], sort_keys=True)),
+                    "shared_terms": shared_terms,
+                    "score": score,
                 }
             )
     return sorted(edges, key=lambda edge: edge["id"])
+
+
+def _normalize_planned_link(link: Any) -> Dict[str, Any]:
+    if isinstance(link, str):
+        return {"target": link, "type": "semantic_similarity", "shared_terms": [], "score": None}
+    return {
+        "target": str(link.get("target", "")),
+        "type": str(link.get("type", "semantic_similarity")),
+        "shared_terms": list(link.get("shared_terms", [])),
+        "score": link.get("score"),
+    }
 
 
 def _extract_internal_links(source_path: Path, brain_dir: Path, node_ids: set[str]) -> Iterable[Tuple[str, str]]:

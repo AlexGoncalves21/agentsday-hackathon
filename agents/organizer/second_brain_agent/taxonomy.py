@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, TypedDict
 
 from .models import InputDocument
 
@@ -23,11 +23,21 @@ MAX_RELATED_SLUGS = 6
 MIN_SHARED_TFIDF_SCORE = 0.28
 
 
+class SemanticLink(TypedDict):
+    slug: str
+    score: float
+    terms: List[str]
+
+
 def category_for(document: InputDocument) -> str:
     return CATEGORY_BY_SLUG.get(document.slug, "concepts")
 
 
 def related_slugs_for(document: InputDocument, all_documents: Iterable[InputDocument]) -> List[str]:
+    return [link["slug"] for link in semantic_links_for(document, all_documents)]
+
+
+def semantic_links_for(document: InputDocument, all_documents: Iterable[InputDocument]) -> List[SemanticLink]:
     documents = list(all_documents)
     relevant_terms_by_slug = _relevant_terms_by_slug(documents)
     document_terms = relevant_terms_by_slug.get(document.slug, {})
@@ -40,7 +50,10 @@ def related_slugs_for(document: InputDocument, all_documents: Iterable[InputDocu
         if shared_score >= MIN_SHARED_TFIDF_SCORE:
             related.append((other.slug, shared_score, sorted(shared_terms)))
     related.sort(key=lambda item: (-item[1], item[0]))
-    return [slug for slug, _score, _terms in related[:MAX_RELATED_SLUGS]]
+    return [
+        {"slug": slug, "score": round(score, 4), "terms": terms}
+        for slug, score, terms in related[:MAX_RELATED_SLUGS]
+    ]
 
 
 def _relevant_terms_by_slug(documents: List[InputDocument]) -> Dict[str, Dict[str, float]]:

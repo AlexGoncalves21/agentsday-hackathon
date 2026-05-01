@@ -202,23 +202,23 @@ button:disabled {
 }
 
 .links-layer line {
-  opacity: 0.82;
+  opacity: 0.92;
   vector-effect: non-scaling-stroke;
 }
 
 .links-layer .graph-link-new {
-  opacity: 0.95;
+  opacity: 1;
 }
 
 .network-graph-evolution .links-layer .graph-link-new {
-  filter: drop-shadow(0 0 4px rgba(88, 185, 159, 0.24));
-  opacity: 0.88;
+  filter: drop-shadow(0 0 4px rgba(36, 153, 127, 0.32));
+  opacity: 1;
 }
 
 .links-layer .graph-link-selected {
   opacity: 1;
   stroke: var(--palette-slate);
-  stroke-width: 2.2;
+  stroke-width: 3;
 }
 
 .graph-node {
@@ -534,6 +534,59 @@ button:disabled {
   display: block;
   padding: 0;
   white-space: pre;
+}
+
+.connection-reasons {
+  border-top: 1px solid var(--border);
+  margin-top: 18px;
+  padding-top: 14px;
+}
+
+.connection-reasons h3 {
+  color: var(--text);
+  font-size: 14px;
+  margin: 0 0 10px;
+}
+
+.connection-reason {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+  padding: 9px 10px;
+}
+
+.connection-reason strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+
+.connection-reason div,
+.connection-terms div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.connection-reason code,
+.connection-terms code {
+  background: rgba(88, 185, 159, 0.13);
+  border: 1px solid rgba(88, 185, 159, 0.26);
+  color: var(--palette-forest);
+}
+
+.connection-terms {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin: 12px 0;
+  padding: 10px;
+}
+
+.connection-terms span {
+  color: var(--text-soft);
+  display: block;
+  font-size: 12px;
+  margin-bottom: 7px;
 }
 
 .markdown-box-error {

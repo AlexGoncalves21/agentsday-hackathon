@@ -13,7 +13,7 @@ from .markdown import markdown_list, parse_input_document, relative_markdown_lin
 from .models import AgentConfig, BrainPage, ExistingBrainPage, InputDocument, PromptConfig, QualityCheck
 from .quality import evaluate_brain
 from .reasoning import OrganizerReasoner
-from .taxonomy import CATEGORIES, category_for, group_by_category, related_slugs_for
+from .taxonomy import CATEGORIES, category_for, group_by_category, related_slugs_for, semantic_links_for
 from .trace import TraceRecorder
 
 MIN_LOOP_ITERATIONS = 2
@@ -517,16 +517,20 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             self._write(source_path, content)
             self.trace.subagent("archivist", f"Wrote source summary `{self._repo_rel(source_path)}`.")
 
-    def _semantic_graph_links(self) -> Dict[str, List[str]]:
+    def _semantic_graph_links(self) -> Dict[str, List[Dict[str, object]]]:
         documents = self._graph_documents()
         rel_by_slug = {document.slug: self._brain_rel(document.path) for document in documents}
-        planned_links: Dict[str, List[str]] = {}
+        planned_links: Dict[str, List[Dict[str, object]]] = {}
         for document in documents:
             source_rel = rel_by_slug[document.slug]
             planned_links[source_rel] = [
-                rel_by_slug[related_slug]
-                for related_slug in related_slugs_for(document, documents)
-                if related_slug in rel_by_slug
+                {
+                    "target": rel_by_slug[link["slug"]],
+                    "shared_terms": link["terms"],
+                    "score": link["score"],
+                }
+                for link in semantic_links_for(document, documents)
+                if link["slug"] in rel_by_slug
             ]
         self.trace.subagent(
             "critic",
