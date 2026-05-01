@@ -11,6 +11,7 @@ from .markdown import markdown_list, parse_input_document, relative_markdown_lin
 from .models import AgentConfig, BrainPage, InputDocument, PromptConfig, QualityCheck
 from .quality import evaluate_brain
 from .taxonomy import CATEGORIES, category_for, group_by_category, related_slugs_for
+from .trace import TraceRecorder
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class WikiCompiler:
         self.config = config
         self.prompts = prompts
         self.workspace = workspace
+        self.trace = TraceRecorder(config.paths.runs_dir)
 
     @classmethod
     def from_files(
@@ -42,6 +44,8 @@ class WikiCompiler:
         )
 
     def run(self) -> CompileResult:
+        self.trace.reset()
+        self.trace.event("start", "Starting Organizer run", mode=self.config.mode)
         docs = self._load_inputs()
         self._prepare_output_dirs()
         pages = self._plan_pages(docs)
@@ -52,7 +56,12 @@ class WikiCompiler:
         self._write_open_questions(docs, pages)
         self._write_changelog(docs, pages)
         quality_checks = evaluate_brain(self.config.paths.brain_dir, docs, pages)
+        for check in quality_checks:
+            self.trace.subagent("critic", f"{check.name}: {'passed' if check.passed else 'failed'} - {check.details}")
         report_path = self._write_run_reports(docs, pages, quality_checks)
+        self.trace.subagent("archivist", f"Wrote run report to {self._repo_rel(report_path)}.")
+        self.trace.flush_subagents()
+        self.trace.event("finish", "Finished Organizer run", report=self._repo_rel(report_path))
         return CompileResult(
             inputs_processed=len(docs),
             pages_written=len(pages),
@@ -68,6 +77,12 @@ class WikiCompiler:
         docs = [parse_input_document(path) for path in sorted(input_dir.glob("*.md"))]
         if not docs:
             raise ValueError(f"No Markdown inputs found in {input_dir}")
+        self.trace.event(
+            "load",
+            "Loaded input Markdown files",
+            count=len(docs),
+            inputs=[self._repo_rel(doc.path) for doc in docs],
+        )
         return docs
 
     def _prepare_output_dirs(self) -> None:
@@ -79,6 +94,13 @@ class WikiCompiler:
         runs_dir.mkdir(parents=True, exist_ok=True)
         for category in CATEGORIES:
             (brain_dir / category).mkdir(parents=True, exist_ok=True)
+        self.trace.event(
+            "prepare",
+            "Prepared output directories",
+            brain_dir=self._repo_rel(brain_dir),
+            runs_dir=self._repo_rel(runs_dir),
+            rebuilt=self.config.mode == "dev",
+        )
 
     def _safe_rmtree(self, path: Path) -> None:
         resolved = path.resolve()
@@ -100,11 +122,16 @@ class WikiCompiler:
                 source_doc=doc,
                 related_slugs=related_slugs_for(doc, docs),
             )
+            self.trace.subagent(
+                "curator",
+                f"Assigned `{doc.title}` to `{category}/{doc.slug}.md`.",
+            )
         return pages
 
     def _write_base_files(self, docs: List[InputDocument]) -> None:
         self._write_readme(docs)
         self._write_schema()
+        self.trace.subagent("archivist", "Wrote README.md and schema.md.")
 
     def _write_readme(self, docs: List[InputDocument]) -> None:
         brain_dir = self.config.paths.brain_dir
@@ -176,6 +203,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             link = relative_markdown_link(index_path, source_path, doc.title)
             lines.append(f"- {link}")
         self._write(index_path, "\n".join(lines))
+        self.trace.subagent("archivist", "Generated final brain/index.md with core, compiled, and source links.")
 
     def _write_open_questions(self, docs: List[InputDocument], pages: Dict[str, BrainPage]) -> None:
         questions = []
@@ -189,6 +217,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             questions.append("- No obvious unresolved questions were detected during this deterministic pass.")
         content = "# Open Questions\n\n" + "\n".join(questions) + "\n"
         self._write(self.config.paths.brain_dir / "open_questions.md", content)
+        self.trace.subagent("critic", f"Collected {len(questions)} open-question notes.")
 
     def _write_changelog(self, docs: List[InputDocument], pages: Dict[str, BrainPage]) -> None:
         now = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -203,6 +232,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             "- Updated index, schema, open questions, changelog, and run report.",
         ]
         self._write(self.config.paths.brain_dir / "changelog.md", "\n".join(lines) + "\n")
+        self.trace.subagent("archivist", "Updated changelog.md.")
 
     def _write_brain_pages(self, pages: Dict[str, BrainPage]) -> None:
         for page in pages.values():
@@ -230,6 +260,10 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             if related_links:
                 lines.extend(["", "## Related", "", markdown_list(related_links)])
             self._write(page.path, "\n".join(lines) + "\n")
+            self.trace.subagent(
+                "synthesizer",
+                f"Wrote `{self._repo_rel(page.path)}` with {len(doc.sources)} source URL(s).",
+            )
 
     def _write_source_pages(self, pages: Dict[str, BrainPage]) -> None:
         for page in pages.values():
@@ -256,6 +290,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
 {markdown_list(doc.sources)}
 """
             self._write(source_path, content)
+            self.trace.subagent("archivist", f"Wrote source summary `{self._repo_rel(source_path)}`.")
 
     def _write_run_reports(
         self,
@@ -291,6 +326,14 @@ Mode: `{self.config.mode}`
 ## Index
 
 - brain/index.md
+
+## Trace
+
+- runs/trace.jsonl
+- runs/subagents/curator.md
+- runs/subagents/synthesizer.md
+- runs/subagents/critic.md
+- runs/subagents/archivist.md
 
 ## Final Status
 

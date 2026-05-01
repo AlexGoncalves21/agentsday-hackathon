@@ -1,6 +1,6 @@
 # Run Report
 
-Date: 2026-05-01T11:09:38+01:00
+Date: 2026-05-01T11:47:23+01:00
 Mode: `dev`
 
 ## Inputs Processed
@@ -50,6 +50,14 @@ Mode: `dev`
 ## Index
 
 - brain/index.md
+
+## Trace
+
+- runs/trace.jsonl
+- runs/subagents/curator.md
+- runs/subagents/synthesizer.md
+- runs/subagents/critic.md
+- runs/subagents/archivist.md
 
 ## Final Status
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from .models import AgentConfig, PromptConfig
@@ -13,6 +14,12 @@ def build_model_string(config: AgentConfig) -> str:
 
 
 def run_deep_agent(config: AgentConfig, prompts: PromptConfig, workspace: Path) -> str:
+    if sys.version_info < (3, 11):
+        version = ".".join(map(str, sys.version_info[:3]))
+        raise RuntimeError(
+            f"The LLM-backed Organizer requires Python 3.11+ because `deepagents` requires it. "
+            f"You are running Python {version}. Use a Python 3.11+ virtualenv/conda env."
+        )
     try:
         from deepagents import create_deep_agent
         from deepagents.backends import FilesystemBackend

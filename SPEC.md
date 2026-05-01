@@ -236,7 +236,7 @@ It should behave like a compiler, not a chatbot:
 ### Runtime
 
 - Uses LangChain Deep Agents SDK.
-- Uses Gemini Flash for development.
+- Uses Gemini 3.0 Flash for development.
 - Runs periodically during the demo.
 - Can also be triggered manually for testing.
 - Reads runtime behavior from `agents/organizer/config.yaml`.
@@ -271,7 +271,7 @@ paths:
 
 model:
   provider: gemini
-  name: gemini-2.5-flash
+  name: gemini-3-flash-preview
 
 loop:
   max_iterations: 3
@@ -285,6 +285,8 @@ In `dev` mode:
 - Organizer does not delete input files after processing.
 - Organizer rebuilds `brain/` from scratch on every run.
 - Organizer writes a fresh `runs/latest_report.md`.
+- Organizer writes a fresh `runs/trace.jsonl`.
+- Organizer writes sub-agent trace notes under `runs/subagents/`.
 - Organizer does not use previous run reports as context.
 
 This makes the compiler repeatable while prompts, schemas, and writer behavior are being tuned.
@@ -310,7 +312,8 @@ Each run should:
 8. Apply improvements.
 9. Repeat until quality criteria are met or the maximum loop count is reached.
 10. Generate the final `brain/index.md` after the Markdown pages are written.
-11. Write a run report to `runs/latest_report.md`.
+11. Write trace artifacts to `runs/trace.jsonl` and `runs/subagents/`.
+12. Write a run report to `runs/latest_report.md`.
 
 ### Suggested Max Loop Count
 
@@ -373,7 +376,7 @@ Every meaningful claim in the brain should be traceable to a source.
 For the MVP, citations can be simple Markdown links to source pages or raw input files:
 
 ```md
-Gemini Flash is used as the development model for this project. See [source](../sources/example-source.md).
+Gemini 3.0 Flash is used as the development model for this project. See [source](../sources/example-source.md).
 ```
 
 The system should avoid inventing unsupported claims. If a claim is useful but uncertain, it should be marked as uncertain or moved to `open_questions.md`.
@@ -532,9 +535,9 @@ Good live Telegram examples:
 
 ## Technology Stack
 
-- Python
+- Python 3.11+ for the LLM-backed Deep Agents path
 - LangChain Deep Agents SDK
-- Gemini Flash during development
+- Gemini 3.0 Flash during development
 - Telegram Bot API
 - Cloudflare Tunnel
 - Markdown files as storage
