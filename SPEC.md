@@ -4,7 +4,7 @@
 
 This project is a personal second brain that grows from things sent over Telegram: links, names, concepts, questions, notes, and other fragments worth remembering or researching.
 
-Agent 1 receives submissions through Telegram, enriches them when useful, and saves each item as a Markdown file in an append-only input directory. Agent 2 periodically compiles those raw inputs into a curated Markdown knowledge base inspired by Karpathy's LLM Wiki pattern: raw sources stay intact, while the wiki is continuously reorganized, cross-linked, linted, and improved by agents.
+The Researcher receives submissions through Telegram, enriches them when useful, and saves each item as a Markdown file in an append-only input directory. The Organizer periodically compiles those raw inputs into a curated Markdown knowledge base inspired by Karpathy's LLM Wiki pattern: raw sources stay intact, while the wiki is continuously reorganized, cross-linked, linted, and improved by agents.
 
 The goal is not just to store links. The goal is to turn a stream of interesting inputs into a useful, source-backed personal knowledge base.
 
@@ -44,13 +44,13 @@ The goal is not just to store links. The goal is to turn a stream of interesting
 Telegram
    |
    v
-Agent 1: Ingestion Bot
+Researcher: Ingestion Bot
    |
    v
 input/
    |
    v
-Agent 2: Wiki Compiler
+Organizer: Wiki Compiler
    |
    v
 brain/
@@ -80,19 +80,59 @@ The system is file-first. Markdown files are the main interface between agents, 
 │   ├── people/
 │   ├── companies/
 │   ├── projects/
+│   ├── events/
+│   ├── works/
 │   ├── concepts/
 │   └── sources/
 ├── runs/
 │   └── latest_report.md
-├── config/
-│   ├── quality_criteria.md
-│   └── prompts/
+├── agents/
+│   ├── researcher/
+│   │   ├── README.md
+│   │   └── prompts/
+│   │       └── researcher.yaml
+│   └── organizer/
+│       ├── README.md
+│       ├── config.yaml
+│       ├── prompts/
+│       │   └── organizer.yaml
+│       ├── second_brain_agent/
+│       └── tests/
 └── SPEC.md
 ```
 
-## Agent 1: Telegram Ingestion Bot
+## Code Organization
 
-Agent 1 is responsible for receiving Telegram submissions and converting them into raw Markdown inputs.
+The implementation should follow normal modular code best practices. The goal is to make the hackathon build fast without creating a single hard-to-debug script.
+
+Suggested module boundaries:
+
+- Telegram ingestion and webhook handling.
+- Content extraction and web lookup.
+- Input Markdown writing.
+- Organizer config loading.
+- Input Markdown parsing.
+- Brain planning.
+- Brain writing.
+- Evaluator passes.
+- Run reporting.
+
+Prompts should live outside the code in YAML files:
+
+- `agents/researcher/prompts/researcher.yaml` for Telegram ingestion, enrichment, and input Markdown generation.
+- `agents/organizer/prompts/organizer.yaml` for second brain compilation, sub-agent roles, and evaluator instructions.
+
+Code should load prompts from these files instead of hardcoding long prompt strings inside Python modules.
+
+Each main agent should own its code, config, prompts, and tests inside its own directory under `agents/`. Shared product artifacts stay at the repo root:
+
+- `input/` is the handoff directory written by Researcher and read by Organizer.
+- `brain/` is the compiled second brain written by Organizer.
+- `runs/` contains Organizer run reports.
+
+## Researcher: Telegram Ingestion Bot
+
+Researcher is responsible for receiving Telegram submissions and converting them into raw Markdown inputs.
 
 ### Interface
 
@@ -115,7 +155,7 @@ Agent 1 is responsible for receiving Telegram submissions and converting them in
 
 ### Ingestion Behavior
 
-For every submitted item, Agent 1 should:
+For every submitted item, Researcher should:
 
 1. Accept the item.
 2. Classify it lightly as a URL, name, concept, question, note, or unknown item.
@@ -128,57 +168,63 @@ For every submitted item, Agent 1 should:
 
 ### Raw Input Markdown Format
 
-The raw input files should stay simple. No YAML frontmatter is required for the MVP.
+The raw input files should stay simple, information-dense, and consistent. No YAML frontmatter is required for the MVP.
 
 ```md
-# Submission
+# Title
 
-https://example.com/article
+Short human-readable title.
 
-# Content
+## Information
 
-Extracted article text, transcript, tweet text, or best-effort content goes here.
+Dense extracted or researched information. This can mix paragraphs and bullet points.
 
-# Notes
+Researcher should include enough context that Organizer can compile a useful second brain page without doing first-pass research again.
 
-Optional extraction notes, errors, or context from the ingestion agent.
+## Sources
+
+- https://example.com/article
+- https://example.com/another-source
 ```
 
 For a non-URL input:
 
 ```md
-# Submission
+# Geoffrey Hinton
 
-Geoffrey Hinton
+## Information
 
-# Content
+Geoffrey Hinton is a computer scientist and cognitive psychologist known for foundational work in neural networks and deep learning.
 
-The user submitted a person name for later research or integration into the second brain.
+Important related topics include backpropagation, neural networks, deep learning, AI safety, and the 2024 Nobel Prize in Physics.
 
-# Notes
+## Sources
 
-Input type: person/name.
+- https://www.nobelprize.org/
+- https://en.wikipedia.org/wiki/Geoffrey_Hinton
 ```
 
 If extraction fails, the file should still be saved:
 
 ```md
-# Submission
+# Failed Extraction: Example Article
 
-https://example.com/article
+## Information
 
-# Content
+Researcher could not extract useful content from the submitted item.
 
-Extraction failed.
-
-# Notes
+Submitted item: https://example.com/article
 
 Reason: paywall, unsupported page, timeout, unavailable transcript, lookup failed, or other error.
+
+## Sources
+
+- https://example.com/article
 ```
 
-## Agent 2: Wiki Compiler
+## Organizer: Wiki Compiler
 
-Agent 2 periodically reads all Markdown files in `input/` and updates the second brain in `brain/`.
+Organizer periodically reads all Markdown files in `input/` and updates the second brain in `brain/`.
 
 It should behave like a compiler, not a chatbot:
 
@@ -193,19 +239,78 @@ It should behave like a compiler, not a chatbot:
 - Uses Gemini Flash for development.
 - Runs periodically during the demo.
 - Can also be triggered manually for testing.
+- Reads runtime behavior from `agents/organizer/config.yaml`.
+- Reads prompt and sub-agent instructions from `agents/organizer/prompts/organizer.yaml`.
+
+### CLI
+
+Organizer should be runnable from the project root:
+
+```bash
+python3 -m agents.organizer.second_brain_agent validate-inputs
+python3 -m agents.organizer.second_brain_agent run
+```
+
+The deterministic compiler path is the default development path. The LLM-backed Deep Agents path can be invoked explicitly once dependencies and Gemini credentials are available:
+
+```bash
+python3 -m agents.organizer.second_brain_agent run --use-llm
+```
+
+### Config
+
+Organizer config should stay small. Quality expectations belong in this spec and in prompts, not in a large config tree.
+
+```yaml
+mode: dev
+
+paths:
+  input_dir: input
+  brain_dir: brain
+  runs_dir: runs
+
+model:
+  provider: gemini
+  name: gemini-2.5-flash
+
+loop:
+  max_iterations: 3
+```
+
+### Run Modes
+
+In `dev` mode:
+
+- Organizer reads every Markdown file in `input/`.
+- Organizer does not delete input files after processing.
+- Organizer rebuilds `brain/` from scratch on every run.
+- Organizer writes a fresh `runs/latest_report.md`.
+- Organizer does not use previous run reports as context.
+
+This makes the compiler repeatable while prompts, schemas, and writer behavior are being tuned.
+
+In future `prod` mode:
+
+- Organizer can preserve `brain/` and update it incrementally.
+- Organizer can archive or mark processed inputs.
+- Organizer still writes run reports.
+- Organizer should avoid rebuilding from scratch unless explicitly configured.
 
 ### Compiler Loop
 
 Each run should:
 
 1. Read all files in `input/`, including any existing documents already present before the latest Telegram message.
-2. Inspect the current `brain/` state.
-3. Decide which pages need to be created or updated.
-4. Update the brain.
-5. Run evaluator sub-agents.
-6. Apply improvements.
-7. Repeat until quality criteria are met or the maximum loop count is reached.
-8. Write a run report to `runs/latest_report.md`.
+2. Parse each file according to the required title, information, and sources structure.
+3. If running in `dev` mode, clear and rebuild `brain/` from scratch.
+4. If running in future `prod` mode, inspect the current `brain/` state and update incrementally.
+5. Decide which pages need to be created or updated.
+6. Update the brain.
+7. Run evaluator sub-agents.
+8. Apply improvements.
+9. Repeat until quality criteria are met or the maximum loop count is reached.
+10. Generate the final `brain/index.md` after the Markdown pages are written.
+11. Write a run report to `runs/latest_report.md`.
 
 ### Suggested Max Loop Count
 
@@ -252,6 +357,12 @@ The second brain should be a Markdown wiki.
 `brain/projects/`
 : Products, repositories, tools, and initiatives.
 
+`brain/events/`
+: Historical events, battles, releases, incidents, and dated milestones.
+
+`brain/works/`
+: Books, essays, videos, fictional works, papers, and other authored artifacts.
+
 `brain/sources/`
 : Source-level summaries and references back to raw input files.
 
@@ -269,7 +380,7 @@ The system should avoid inventing unsupported claims. If a claim is useful but u
 
 ## Sub-Agents
 
-Agent 2 should use specialized sub-agents inside its closed loop.
+Organizer should use specialized sub-agents inside its closed loop.
 
 ### Curator
 
@@ -334,7 +445,7 @@ The compiler loop should continue until these criteria are met or the max loop c
 
 ## Run Report Format
 
-Each Agent 2 run should write:
+Each Organizer run should write:
 
 ```md
 # Run Report
@@ -383,15 +494,15 @@ Prepare:
 - An initialized `brain/` with either no content or a small existing wiki.
 - Telegram bot running locally.
 - Cloudflare Tunnel connected to the bot webhook.
-- Agent 2 ready to run manually or on a short interval.
+- Organizer ready to run manually or on a short interval.
 
 ### Demo Steps
 
 1. Show `input/` already contains one document.
 2. Send a new item to the Telegram bot. This can be a URL, name, concept, or question.
-3. Show Agent 1 creates a new Markdown file in `input/`.
-4. Trigger Agent 2.
-5. Show Agent 2 reads both:
+3. Show Researcher creates a new Markdown file in `input/`.
+4. Trigger Organizer.
+5. Show Organizer reads both:
    - the existing input document
    - the new Telegram-created document
 6. Show `brain/` being updated.
@@ -430,20 +541,20 @@ Good live Telegram examples:
 
 ## Open Decisions
 
-- Exact scheduler mechanism for Agent 2.
-- Whether processed input files should be marked externally or left fully immutable.
+- Exact scheduler mechanism for Organizer.
+- Whether future prod mode should archive processed input files, mark them externally, or leave them fully immutable.
 - Whether the brain should use Obsidian-style `[[wiki links]]` or plain Markdown links.
 - Whether source extraction should use dedicated libraries per source type.
 - Whether Telegram should support commands like `/run`, `/status`, and `/ask`.
-- Whether Agent 2 should commit changes to Git after each successful run.
+- Whether Organizer should commit changes to Git after each successful run.
 
 ## MVP Acceptance Criteria
 
 - A user can send a URL, name, concept, question, or note to Telegram.
 - A Markdown file is created in `input/`.
-- Agent 2 processes all files in `input/`, including pre-existing ones.
-- Agent 2 creates or updates a Markdown second brain in `brain/`.
-- Agent 2 runs at least one critique/improvement pass.
+- Organizer processes all files in `input/`, including pre-existing ones.
+- In dev mode, Organizer rebuilds a Markdown second brain in `brain/` from scratch.
+- Organizer runs at least one critique/improvement pass.
 - The brain includes source traceability.
 - A run report is written to `runs/latest_report.md`.
 - The demo can show a before/after diff of the brain.

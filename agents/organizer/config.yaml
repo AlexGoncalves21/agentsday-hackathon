@@ -1,0 +1,14 @@
+mode: dev
+
+paths:
+  input_dir: input
+  brain_dir: brain
+  runs_dir: runs
+
+model:
+  provider: gemini
+  name: gemini-2.5-flash
+
+loop:
+  max_iterations: 3
+
