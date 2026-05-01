@@ -199,6 +199,61 @@ model:
             graph = json.loads((brain_dir / "graph.json").read_text())
             edge_pairs = {(edge["source"], edge["target"]) for edge in graph["edges"]}
             self.assertIn(("concepts/ai-is-no-ui.md", "concepts/intelligence-vs-agency.md"), edge_pairs)
+            self.assertEqual(1, len(edge_pairs))
+
+    def test_scan_mode_does_not_link_unrelated_long_notes_to_everything(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            input_dir = workspace / "input"
+            brain_dir = workspace / "brain"
+            runs_dir = workspace / "runs"
+            input_dir.mkdir()
+            (brain_dir / "concepts").mkdir(parents=True)
+            (brain_dir / "sources").mkdir(parents=True)
+            (brain_dir / "concepts" / "intelligence-vs-agency.md").write_text(
+                "# Intelligence vs Agency\n\nAI agents connect intelligence, agency, automation, and interfaces.\n"
+            )
+            (brain_dir / "concepts" / "decision-theory.md").write_text(
+                "# Decision Theory\n\nDecision making, uncertainty, and game theory.\n"
+            )
+            (brain_dir / "sources" / "existing.md").write_text("# Source: Existing\n")
+            (input_dir / "roman.md").write_text(
+                """# Roman Empire
+
+## Information
+
+The Roman Empire had government, military administration, public infrastructure, legal systems, and social hierarchy.
+This deliberately long note shares generic words with many other subjects, but its title does not describe the same concept.
+
+## Sources
+
+- https://example.com/roman
+"""
+            )
+            config_path = workspace / "config.yaml"
+            config_path.write_text(
+                """mode: scan
+
+paths:
+  input_dir: input
+  brain_dir: brain
+  runs_dir: runs
+
+model:
+  provider: gemini
+  name: gemini-3-flash-preview
+"""
+            )
+            prompt_path = workspace / "prompts.yaml"
+            prompt_path.write_text("system: ''\n")
+
+            WikiCompiler.from_files(config_path, prompt_path, workspace).run()
+
+            roman_page = brain_dir / "concepts" / "roman-empire.md"
+            self.assertTrue(roman_page.exists())
+            self.assertNotIn("## Related", roman_page.read_text())
+            graph = json.loads((brain_dir / "graph.json").read_text())
+            self.assertFalse(any(edge["source"] == "concepts/roman-empire.md" for edge in graph["edges"]))
 
     def test_failed_input_parse_does_not_delete_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

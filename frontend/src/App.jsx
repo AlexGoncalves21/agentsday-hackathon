@@ -6,6 +6,7 @@ import {
   Minimize2,
   Minus,
   Plus,
+  RotateCcw,
   Search,
 } from 'lucide-react'
 import './styles.css'
@@ -116,6 +117,7 @@ export default function App() {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
   const panRef = useRef(null)
+  const scanMessageTimerRef = useRef(null)
   const [graph, setGraph] = useState(null)
   const [graphHistory, setGraphHistory] = useState([])
   const [currentGraphIndex, setCurrentGraphIndex] = useState(0)
@@ -132,34 +134,49 @@ export default function App() {
   const [isPanning, setIsPanning] = useState(false)
   const [displayNodes, setDisplayNodes] = useState([])
   const [error, setError] = useState(null)
+  const [graphLoadComplete, setGraphLoadComplete] = useState(false)
   const [scanState, setScanState] = useState({ running: false, message: '', tone: 'neutral' })
-  const [previousGraphState] = useState(() => loadStoredGraphState())
+  const [previousGraphState, setPreviousGraphState] = useState(() => loadStoredGraphState())
 
-  async function loadGraph() {
+  async function loadGraph(options = {}) {
+    const { simulateEvolution = true } = options
     try {
       setError(null)
       const [graphResponse, historyResponse] = await Promise.all([
         fetch('/brain/graph.json', { cache: 'no-store' }),
         fetch('/brain/graph_history.json', { cache: 'no-store' }),
       ])
-      if (!graphResponse.ok) throw new Error('Missing brain/graph.json. Run the Organizer first.')
+      if (graphResponse.status === 404) {
+        setGraph(null)
+        setGraphHistory([])
+        setCurrentGraphIndex(0)
+        setEvolutionMode(false)
+        setGraphLoadComplete(true)
+        return null
+      }
+      if (!graphResponse.ok) throw new Error('Unable to load brain/graph.json.')
       const nextGraph = sanitizeGraph(await graphResponse.json())
       const historyPayload = historyResponse.ok ? await historyResponse.json() : null
-      const historyGraphs = normalizeHistory(historyPayload, nextGraph)
+      const historyGraphs = normalizeHistory(historyPayload, nextGraph, { simulateEvolution })
       const nextIndex = historyGraphs.findIndex((historyGraph) => historyGraph.build_id === nextGraph.build_id)
       setGraphHistory(historyGraphs)
       setCurrentGraphIndex(nextIndex >= 0 ? nextIndex : historyGraphs.length - 1)
       setGraph(historyGraphs[nextIndex >= 0 ? nextIndex : historyGraphs.length - 1] || nextGraph)
       localStorage.setItem(LAST_SEEN_GRAPH_KEY, JSON.stringify(snapshotGraphState(nextGraph)))
+      setGraphLoadComplete(true)
       return { historyGraphs, graphIndex: nextIndex >= 0 ? nextIndex : historyGraphs.length - 1, graph: nextGraph }
     } catch (loadError) {
       setError(loadError.message)
+      setGraphLoadComplete(true)
       return null
     }
   }
 
   useEffect(() => {
     loadGraph()
+    return () => {
+      if (scanMessageTimerRef.current) window.clearTimeout(scanMessageTimerRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -337,35 +354,88 @@ export default function App() {
     setCurrentGraphIndex(Math.max(graphHistory.length - 1, 0))
   }
 
+  function setScanStatus(nextState, clearAfterMs) {
+    if (scanMessageTimerRef.current) window.clearTimeout(scanMessageTimerRef.current)
+    setScanState(nextState)
+    if (clearAfterMs) {
+      scanMessageTimerRef.current = window.setTimeout(() => {
+        setScanState((currentState) => ({ ...currentState, message: '', tone: 'neutral' }))
+        scanMessageTimerRef.current = null
+      }, clearAfterMs)
+    }
+  }
+
   async function scanInput() {
     if (scanState.running) return
-    setScanState({ running: true, message: 'Scanning input...', tone: 'neutral' })
+    setScanStatus({ running: true, message: 'Scanning input...', tone: 'neutral' })
+    const graphBeforeScan = graph
     try {
       const pendingResponse = await fetch('/api/scan-input', { cache: 'no-store' })
       const pendingResult = await pendingResponse.json()
       const hasPendingInputs = pendingResult.pendingInputs?.length > 0
+      if (!hasPendingInputs) {
+        setScanStatus({ running: false, message: 'No new input Markdown files found.', tone: 'neutral' }, 5000)
+        return
+      }
       if (hasPendingInputs) {
-        setScanState({ running: true, message: 'Processing new files...', tone: 'info' })
+        setScanStatus({ running: true, message: 'Processing new files...', tone: 'info' })
       }
 
       const response = await fetch('/api/scan-input', { method: 'POST' })
       const result = await response.json()
       if (!response.ok) {
-        setScanState({
+        setScanStatus({
           running: false,
           message: hasPendingInputs ? 'Processing failed. Check the input file format.' : result.message || 'Scan failed.',
           tone: 'neutral',
         })
         return
       }
-      const loaded = await loadGraph()
+      const loaded = await loadGraph({ simulateEvolution: false })
       if (result.processed && loaded) {
-        setEvolutionMode(true)
-        setCurrentGraphIndex(Math.max(loaded.historyGraphs.length - 1, 0))
+        const scanHistory = graphBeforeScan
+          ? scanEvolutionHistoryFor(graphBeforeScan, loaded.graph, result.processedNodeIds || [])
+          : loaded.historyGraphs
+        setGraphHistory(scanHistory)
+        setGraph(scanHistory[scanHistory.length - 1])
+        setEvolutionMode(Boolean(graphBeforeScan) && scanHistory.length > 1)
+        setCurrentGraphIndex(scanHistory.length - 1)
       }
-      setScanState({ running: false, message: result.message, tone: result.processed ? 'info' : 'neutral' })
+      setScanStatus({ running: false, message: result.message, tone: result.processed ? 'info' : 'neutral' })
     } catch (scanError) {
-      setScanState({ running: false, message: scanError.message, tone: 'neutral' })
+      setScanStatus({ running: false, message: scanError.message, tone: 'neutral' })
+    }
+  }
+
+  async function resetNetwork() {
+    if (scanState.running) return
+    setScanStatus({ running: true, message: 'Resetting network...', tone: 'neutral' })
+    try {
+      const response = await fetch('/api/reset-network', { method: 'POST' })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.message || 'Reset failed.')
+      setGraph(null)
+      setGraphHistory([])
+      setGraphLoadComplete(true)
+      setCurrentGraphIndex(0)
+      setEvolutionMode(false)
+      setSelected(null)
+      setSelectedLink(null)
+      setSelectedMarkdown('')
+      setSelectedMarkdownError(null)
+      setReaderExpanded(false)
+      setZoomLevel(1)
+      setPanOffset({ x: 0, y: 0 })
+      setHoveredId(null)
+      setDraggingId(null)
+      setIsPanning(false)
+      setDisplayNodes([])
+      setError(null)
+      setPreviousGraphState(null)
+      localStorage.removeItem(LAST_SEEN_GRAPH_KEY)
+      setScanStatus({ running: false, message: result.message, tone: 'info' }, 5000)
+    } catch (resetError) {
+      setScanStatus({ running: false, message: resetError.message, tone: 'neutral' })
     }
   }
 
@@ -438,6 +508,10 @@ export default function App() {
           <button type="button" onClick={scanInput} disabled={scanState.running} title="Scan input directory">
             <Search size={18} />
             <span className="toolbar-label toolbar-label-inline">Scan</span>
+          </button>
+          <button type="button" onClick={resetNetwork} disabled={scanState.running} title="Reset generated network">
+            <RotateCcw size={18} />
+            <span className="toolbar-label toolbar-label-inline">Reset</span>
           </button>
           <button
             type="button"
@@ -553,9 +627,9 @@ export default function App() {
                 })}
               </g>
             </svg>
-          ) : (
-            <div className="empty-state">Loading graph</div>
-          )}
+          ) : graphLoadComplete ? (
+            <div className="empty-state">Your second brain is currently empty</div>
+          ) : null}
           {graph ? (
             <div className="zoom-controls" aria-label="Zoom controls">
               <button
@@ -814,7 +888,8 @@ function isExcludedNodeId(id) {
   return EXCLUDED_NODE_IDS.has(id) || EXCLUDED_NODE_PREFIXES.some((prefix) => id.startsWith(prefix))
 }
 
-function normalizeHistory(historyPayload, currentGraph) {
+function normalizeHistory(historyPayload, currentGraph, options = {}) {
+  const { simulateEvolution = true } = options
   const historyGraphs = Array.isArray(historyPayload)
     ? historyPayload
     : Array.isArray(historyPayload?.graphs)
@@ -836,7 +911,57 @@ function normalizeHistory(historyPayload, currentGraph) {
     return leftTime - rightTime
   })
 
-  return shouldUseSimulatedEvolution(graphs, currentGraph) ? simulatedHistoryFor(currentGraph) : graphs
+  return simulateEvolution && shouldUseSimulatedEvolution(graphs, currentGraph) ? simulatedHistoryFor(currentGraph) : graphs
+}
+
+function scanEvolutionHistoryFor(previousGraph, currentGraph, forcedNewNodeIds = []) {
+  if (!previousGraph?.nodes?.length || !currentGraph?.nodes?.length) return [currentGraph]
+
+  const previousNodeIds = new Set(previousGraph.nodes.map((node) => node.id))
+  const previousEdgeIds = new Set((previousGraph.edges || []).map((edge) => edge.id))
+  const currentNodeIds = new Set(currentGraph.nodes.map((node) => node.id))
+  const currentEdgeIds = new Set((currentGraph.edges || []).map((edge) => edge.id))
+  const forcedNewNodes = new Set(forcedNewNodeIds.filter((id) => currentNodeIds.has(id)))
+  const beforeGraph = sanitizeGraph({
+    ...previousGraph,
+    nodes: previousGraph.nodes
+      .filter((node) => currentNodeIds.has(node.id) && !forcedNewNodes.has(node.id))
+      .map((node) => ({ ...node, status: currentGraphNodeStatus(node, currentGraph, previousNodeIds) })),
+    edges: (previousGraph.edges || [])
+      .filter((edge) => currentEdgeIds.has(edge.id) && !forcedNewNodes.has(edge.source) && !forcedNewNodes.has(edge.target))
+      .map((edge) => ({ ...edge, status: currentGraphEdgeStatus(edge, currentGraph, previousEdgeIds) })),
+  })
+  const afterGraph = sanitizeGraph({
+    ...currentGraph,
+    nodes: currentGraph.nodes.map((node) => ({
+      ...node,
+      status: forcedNewNodes.has(node.id) || !previousNodeIds.has(node.id) ? 'new' : node.status || 'unchanged',
+    })),
+    edges: (currentGraph.edges || []).map((edge) => ({
+      ...edge,
+      status:
+        forcedNewNodes.has(edge.source) || forcedNewNodes.has(edge.target) || !previousEdgeIds.has(edge.id)
+          ? 'new'
+          : edge.status || 'unchanged',
+    })),
+  })
+
+  if (beforeGraph.build_id === afterGraph.build_id) {
+    return [afterGraph]
+  }
+  return [beforeGraph, afterGraph]
+}
+
+function currentGraphNodeStatus(node, currentGraph, previousNodeIds) {
+  if (!previousNodeIds.has(node.id)) return 'new'
+  const current = currentGraph.nodes.find((candidate) => candidate.id === node.id)
+  return current?.status || 'unchanged'
+}
+
+function currentGraphEdgeStatus(edge, currentGraph, previousEdgeIds) {
+  if (!previousEdgeIds.has(edge.id)) return 'new'
+  const current = (currentGraph.edges || []).find((candidate) => candidate.id === edge.id)
+  return current?.status || 'unchanged'
 }
 
 function shouldUseSimulatedEvolution(graphs, currentGraph) {

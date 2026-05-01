@@ -104,13 +104,15 @@ def related_slugs_for(document: InputDocument, all_documents: Iterable[InputDocu
 
 
 def _is_related(left: InputDocument, right: InputDocument) -> bool:
-    left_terms = _interesting_words(" ".join([left.title, left.information]))
-    right_terms = _interesting_words(" ".join([right.title, right.information]))
-    return len(left_terms & right_terms) >= 2 or bool(_expanded_terms(left_terms) & right_terms)
+    left_terms = _title_terms(left)
+    right_terms = _title_terms(right)
+    if len(left_terms & right_terms) >= 2:
+        return True
+    return bool(_expanded_terms(left_terms) & right_terms) or bool(left_terms & _expanded_terms(right_terms))
 
 
-def _shares_interesting_word(left: str, right: str) -> bool:
-    return bool(_interesting_words(left) & _interesting_words(right))
+def _title_terms(document: InputDocument) -> set[str]:
+    return _interesting_words(" ".join([document.title, document.slug]))
 
 
 def _interesting_words(value: str) -> set[str]:
@@ -132,12 +134,22 @@ def _interesting_words(value: str) -> set[str]:
         "by",
         "with",
         "from",
+        "and",
+        "or",
+        "not",
         "post",
         "source",
         "information",
+        "topic",
+        "concept",
     }
     normalized = value.lower().replace("/", " ").replace("-", " ")
-    return {word.strip(".,:;!?()[]`'\"") for word in normalized.split() if word not in stopwords and len(word) > 1}
+    short_terms = {"ai", "ui"}
+    return {
+        word.strip(".,:;!?()[]`'\"")
+        for word in normalized.split()
+        if word not in stopwords and (len(word) > 2 or word in short_terms)
+    }
 
 
 def _expanded_terms(terms: set[str]) -> set[str]:

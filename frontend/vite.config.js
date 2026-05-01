@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const brainRoot = path.resolve(repoRoot, 'brain')
 const inputRoot = path.resolve(repoRoot, 'input')
-const graphPath = path.resolve(brainRoot, 'graph.json')
+const runsRoot = path.resolve(repoRoot, 'runs')
 let organizerPython = null
 
 function brainStaticPlugin() {
@@ -20,6 +20,11 @@ function brainStaticPlugin() {
       server.middlewares.use((req, res, next) => {
         if (req.url?.startsWith('/api/scan-input')) {
           handleScanInput(req, res)
+          return
+        }
+
+        if (req.url?.startsWith('/api/reset-network')) {
+          handleResetNetwork(req, res)
           return
         }
 
@@ -44,6 +49,27 @@ function brainStaticPlugin() {
         fs.createReadStream(filePath).pipe(res)
       })
     },
+  }
+}
+
+function handleResetNetwork(req, res) {
+  if (req.method !== 'POST') {
+    res.statusCode = 405
+    res.setHeader('allow', 'POST')
+    res.end('Method not allowed')
+    return
+  }
+
+  try {
+    resetNetworkFiles()
+    sendJson(res, {
+      reset: true,
+      pendingInputs: pendingInputFiles(),
+      message: 'Network reset, add Markdown files, then scan.',
+    })
+  } catch (error) {
+    res.statusCode = 500
+    sendJson(res, { reset: false, message: error.message })
   }
 }
 
@@ -74,9 +100,11 @@ function handleScanInput(req, res) {
 
   runOrganizer()
     .then((result) => {
+      const processedNodeIds = compiledNodeIdsForInputs(pendingInputs)
       sendJson(res, {
         processed: true,
         pendingInputs,
+        processedNodeIds,
         message: `Processed ${pendingInputs.length} input file${pendingInputs.length === 1 ? '' : 's'}.`,
         output: result.output,
       })
@@ -92,18 +120,49 @@ function handleScanInput(req, res) {
     })
 }
 
+function resetNetworkFiles() {
+  removeInsideRepo(brainRoot)
+  for (const fileName of ['latest_report.md', 'trace.jsonl']) {
+    removeInsideRepo(path.join(runsRoot, fileName))
+  }
+  removeInsideRepo(path.join(runsRoot, 'subagents'))
+  fs.mkdirSync(brainRoot, { recursive: true })
+  fs.mkdirSync(runsRoot, { recursive: true })
+}
+
+function removeInsideRepo(targetPath) {
+  const resolvedTarget = path.resolve(targetPath)
+  const relativePath = path.relative(repoRoot, resolvedTarget)
+  if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error(`Refusing to delete unsafe path: ${resolvedTarget}`)
+  }
+  fs.rmSync(resolvedTarget, { recursive: true, force: true })
+}
+
 function pendingInputFiles() {
   if (!fs.existsSync(inputRoot)) return []
-  const graphMtime = fs.existsSync(graphPath) ? fs.statSync(graphPath).mtimeMs : 0
   return fs
     .readdirSync(inputRoot)
     .filter((fileName) => fileName.endsWith('.md'))
-    .filter((fileName) => {
-      const inputPath = path.join(inputRoot, fileName)
-      const sourcePath = path.join(brainRoot, 'sources', fileName)
-      return fs.statSync(inputPath).mtimeMs > graphMtime || !fs.existsSync(sourcePath)
-    })
     .sort()
+}
+
+function compiledNodeIdsForInputs(inputFileNames) {
+  return inputFileNames
+    .map((inputFileName) => compiledNodeIdForInput(inputFileName))
+    .filter(Boolean)
+}
+
+function compiledNodeIdForInput(inputFileName) {
+  const sourcePath = path.join(brainRoot, 'sources', inputFileName)
+  if (!fs.existsSync(sourcePath)) return null
+  const sourceText = fs.readFileSync(sourcePath, 'utf8')
+  const compiledMatch = sourceText.match(/## Compiled Into[\s\S]*?\]\(([^)]+)\)/)
+  if (!compiledMatch) return null
+  const compiledPath = path.resolve(path.dirname(sourcePath), compiledMatch[1])
+  const relativePath = path.relative(brainRoot, compiledPath)
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) return null
+  return relativePath.split(path.sep).join('/')
 }
 
 function runOrganizer() {
