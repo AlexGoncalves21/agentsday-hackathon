@@ -59,7 +59,15 @@ def _check_source_urls_preserved(brain_dir: Path, docs: List[InputDocument]) -> 
 
 
 def _check_core_files(brain_dir: Path) -> QualityCheck:
-    required = ["README.md", "schema.md", "index.md", "open_questions.md", "changelog.md"]
+    required = [
+        "README.md",
+        "schema.md",
+        "index.md",
+        "open_questions.md",
+        "changelog.md",
+        "graph.json",
+        "graph_diff.json",
+    ]
     missing = [name for name in required if not (brain_dir / name).exists()]
     return QualityCheck(
         name="Core brain files exist",
@@ -75,7 +83,7 @@ def _check_index_links(
 ) -> QualityCheck:
     index_path = brain_dir / "index.md"
     index_text = index_path.read_text() if index_path.exists() else ""
-    expected = ["README.md", "schema.md", "open_questions.md", "changelog.md"]
+    expected = ["README.md", "schema.md", "open_questions.md", "changelog.md", "graph.json", "graph_diff.json"]
     expected.extend(page.path.name for page in pages)
     expected.extend(doc.path.name for doc in docs)
     missing = [name for name in expected if name not in index_text]

@@ -1,6 +1,6 @@
 # Run Report
 
-Date: 2026-05-01T11:47:23+01:00
+Date: 2026-05-01T12:30:48+01:00
 Mode: `dev`
 
 ## Inputs Processed
@@ -50,6 +50,17 @@ Mode: `dev`
 ## Index
 
 - brain/index.md
+- brain/graph.json
+- brain/graph_diff.json
+
+## Graph
+
+- Nodes: 35
+- Edges: 115
+- New nodes: 0
+- Changed nodes: 1
+- New edges: 0
+- Removed edges: 0
 
 ## Trace
 

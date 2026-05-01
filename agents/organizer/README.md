@@ -25,5 +25,8 @@ Observe the run:
 - `runs/trace.jsonl` records phase-by-phase structured events.
 - `runs/subagents/*.md` contains human-readable notes for the curator, synthesizer, critic, and archivist passes.
 - `brain/index.md` is generated at the end and links the compiled Markdown set.
+- `brain/graph.json` and `brain/graph_diff.json` are generated deterministically after Markdown writing finishes.
 
 The deterministic compiler does not expose hidden model reasoning. It records observable decisions and outputs so the run can be debugged without relying on private chain-of-thought.
+
+Graph generation lives in `agents/organizer/second_brain_agent/graph.py`. It creates one node per Markdown file, extracts internal Markdown and wiki-style links, and records new or changed nodes by comparing the current graph to the previous graph state.

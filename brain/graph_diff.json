@@ -1,0 +1,31 @@
+{
+  "build_id": "e33571bdda5e1183",
+  "changed_nodes": [],
+  "generated_at": "2026-05-01T12:34:42+00:00",
+  "new_edges": [],
+  "new_nodes": [],
+  "previous_build_id": "c9cedab74ae45974",
+  "removed_edges": [],
+  "removed_nodes": [
+    "README.md",
+    "schema.md"
+  ],
+  "unchanged_nodes": [
+    "companies/multiverse-computing.md",
+    "concepts/conways-game-of-life.md",
+    "concepts/decision-theory.md",
+    "concepts/design-patterns.md",
+    "concepts/fibonacci.md",
+    "concepts/game-theory.md",
+    "concepts/intelligence-vs-agency.md",
+    "concepts/lei-de-murphy.md",
+    "concepts/monte-carlo-and-markov-chains.md",
+    "concepts/self-hosting.md",
+    "concepts/tatica-do-quadrado.md",
+    "events/batalha-de-aljubarrota.md",
+    "open_questions.md",
+    "people/demis-hassabis.md",
+    "topics/agent-frameworks-and-elixir-otp.md",
+    "works/all-tomorrows.md"
+  ]
+}

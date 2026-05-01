@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from .config import load_agent_config, load_prompt_config
+from .graph import GraphBuildResult, build_graph_files, load_previous_state
 from .markdown import markdown_list, parse_input_document, relative_markdown_link
 from .models import AgentConfig, BrainPage, InputDocument, PromptConfig, QualityCheck
 from .quality import evaluate_brain
@@ -19,6 +20,7 @@ class CompileResult:
     inputs_processed: int
     pages_written: int
     source_pages_written: int
+    graph_result: GraphBuildResult
     quality_checks: List[QualityCheck]
     report_path: Path
 
@@ -46,6 +48,7 @@ class WikiCompiler:
     def run(self) -> CompileResult:
         self.trace.reset()
         self.trace.event("start", "Starting Organizer run", mode=self.config.mode)
+        previous_graph_state = load_previous_state(self.config.paths.brain_dir)
         docs = self._load_inputs()
         self._prepare_output_dirs()
         pages = self._plan_pages(docs)
@@ -55,10 +58,11 @@ class WikiCompiler:
         self._write_index(docs, pages)
         self._write_open_questions(docs, pages)
         self._write_changelog(docs, pages)
+        graph_result = self._write_graph(previous_graph_state)
         quality_checks = evaluate_brain(self.config.paths.brain_dir, docs, pages)
         for check in quality_checks:
             self.trace.subagent("critic", f"{check.name}: {'passed' if check.passed else 'failed'} - {check.details}")
-        report_path = self._write_run_reports(docs, pages, quality_checks)
+        report_path = self._write_run_reports(docs, pages, graph_result, quality_checks)
         self.trace.subagent("archivist", f"Wrote run report to {self._repo_rel(report_path)}.")
         self.trace.flush_subagents()
         self.trace.event("finish", "Finished Organizer run", report=self._repo_rel(report_path))
@@ -66,6 +70,7 @@ class WikiCompiler:
             inputs_processed=len(docs),
             pages_written=len(pages),
             source_pages_written=len(docs),
+            graph_result=graph_result,
             quality_checks=quality_checks,
             report_path=report_path,
         )
@@ -186,6 +191,10 @@ Uncertain claims should stay visible and should be carried into `open_questions.
         for name in ["README.md", "schema.md", "open_questions.md", "changelog.md"]:
             core_path = self.config.paths.brain_dir / name
             lines.append(f"- {relative_markdown_link(index_path, core_path, name)}")
+        lines.append(f"- {relative_markdown_link(index_path, self.config.paths.brain_dir / 'graph.json', 'graph.json')}")
+        lines.append(
+            f"- {relative_markdown_link(index_path, self.config.paths.brain_dir / 'graph_diff.json', 'graph_diff.json')}"
+        )
         lines.append("")
         for category in ["topics", "concepts", "people", "companies", "projects", "events", "works"]:
             category_docs = grouped_docs.get(category, [])
@@ -204,6 +213,20 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             lines.append(f"- {link}")
         self._write(index_path, "\n".join(lines))
         self.trace.subagent("archivist", "Generated final brain/index.md with core, compiled, and source links.")
+
+    def _write_graph(self, previous_graph_state: Dict[str, object]) -> GraphBuildResult:
+        graph_result = build_graph_files(
+            self.config.paths.brain_dir,
+            previous_graph_state,
+            datetime.now().astimezone(),
+        )
+        self.trace.subagent(
+            "archivist",
+            f"Wrote graph artifacts with {graph_result.node_count} nodes, {graph_result.edge_count} edges, "
+            f"{graph_result.new_nodes} new nodes, {graph_result.changed_nodes} changed nodes, "
+            f"and {graph_result.new_edges} new edges.",
+        )
+        return graph_result
 
     def _write_open_questions(self, docs: List[InputDocument], pages: Dict[str, BrainPage]) -> None:
         questions = []
@@ -296,6 +319,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
         self,
         docs: List[InputDocument],
         pages: Dict[str, BrainPage],
+        graph_result: GraphBuildResult,
         quality_checks: List[QualityCheck],
     ) -> Path:
         now = datetime.now().astimezone()
@@ -326,6 +350,17 @@ Mode: `{self.config.mode}`
 ## Index
 
 - brain/index.md
+- brain/graph.json
+- brain/graph_diff.json
+
+## Graph
+
+- Nodes: {graph_result.node_count}
+- Edges: {graph_result.edge_count}
+- New nodes: {graph_result.new_nodes}
+- Changed nodes: {graph_result.changed_nodes}
+- New edges: {graph_result.new_edges}
+- Removed edges: {graph_result.removed_edges}
 
 ## Trace
 

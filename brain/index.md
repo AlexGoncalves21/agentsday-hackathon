@@ -10,6 +10,8 @@ Compiled inputs: 15
 - [schema.md](schema.md)
 - [open_questions.md](open_questions.md)
 - [changelog.md](changelog.md)
+- [graph.json](graph.json)
+- [graph_diff.json](graph_diff.json)
 
 ## Topics
 

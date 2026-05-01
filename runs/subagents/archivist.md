@@ -18,4 +18,5 @@
 - Wrote source summary `brain/sources/2026-05-01-tatica-do-quadrado.md`.
 - Generated final brain/index.md with core, compiled, and source links.
 - Updated changelog.md.
+- Wrote graph artifacts with 35 nodes, 115 edges, 0 new nodes, 1 changed nodes, and 0 new edges.
 - Wrote run report to runs/latest_report.md.
