@@ -1,2 +1,2 @@
-"""Telegram ingestion agent."""
+"""Telegram research and enrichment agent."""
 

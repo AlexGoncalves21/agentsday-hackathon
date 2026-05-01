@@ -1,0 +1,9 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+requests>=2.32
+python-dotenv>=1.0
+PyYAML>=6.0
+deepagents>=0.4.12
+google-genai>=1.0
+langchain-google-genai
+langsmith>=0.1

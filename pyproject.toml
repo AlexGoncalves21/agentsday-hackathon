@@ -4,13 +4,22 @@ version = "0.1.0"
 description = "Personal second brain agents for the Agents Day hackathon."
 requires-python = ">=3.11"
 dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "requests>=2.32",
+  "python-dotenv>=1.0",
   "PyYAML>=6.0",
   "deepagents>=0.4.12",
+  "google-genai>=1.0",
   "langchain-google-genai",
+  "langsmith>=0.1",
 ]
 
 [project.scripts]
 organizer = "agents.organizer.second_brain_agent.cli:main"
+researcher = "agents.researcher.cli:main"
+telegram-ingest = "agents.ingestion.telegram_bot:main"
+telegram-set-webhook = "agents.ingestion.set_webhook:main"
 
 [tool.setuptools.packages.find]
 include = ["agents*"]

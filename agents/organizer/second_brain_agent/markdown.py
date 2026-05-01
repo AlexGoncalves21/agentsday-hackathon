@@ -7,7 +7,7 @@ from typing import Iterable, List
 
 from .models import InputDocument
 
-URL_RE = re.compile(r"https?://[^\s)>]+")
+URL_RE = re.compile(r"(?:https?|telegram)://[^\s)>]+")
 
 
 class InputParseError(ValueError):
