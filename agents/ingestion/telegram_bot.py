@@ -19,6 +19,7 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 WEBHOOK_PATH = os.getenv("TELEGRAM_WEBHOOK_PATH", "/telegram/webhook")
 
 RESET_COMMANDS = {"/new", "/reset", "/clear"}
+ASK_COMMAND = "/ask"
 
 app = FastAPI(title="Personal LLM Wiki Telegram Ingestion Bot")
 
@@ -64,18 +65,44 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks) 
     stripped = text.strip()
     if stripped.lower() in RESET_COMMANDS:
         if chat_id is not None:
-            get_service().reset_conversation(chat_id)
-            send_telegram_message(chat_id, "Conversation reset. Send a new topic to start.")
+            get_service().clear_qa(chat_id)
+            send_telegram_message(chat_id, "Conversation cleared.")
         return {"ok": True}
 
     if chat_id is None:
         return {"ok": True}
 
-    send_telegram_message(chat_id, "Received.")
+    if _is_ask_command(stripped):
+        question = _strip_ask_prefix(stripped)
+        if not question:
+            send_telegram_message(chat_id, "Usage: /ask <your question about your brain>")
+            return {"ok": True}
+        send_telegram_message(chat_id, "Received.")
+        background_tasks.add_task(process_ask_background, question, chat_id)
+        return {"ok": True}
 
+    send_telegram_message(chat_id, "Received.")
     background_tasks.add_task(process_submission_background, text, chat_id)
 
     return {"ok": True}
+
+
+def _is_ask_command(stripped: str) -> bool:
+    lowered = stripped.lower()
+    return lowered == ASK_COMMAND or lowered.startswith(ASK_COMMAND + " ")
+
+
+def _strip_ask_prefix(stripped: str) -> str:
+    return stripped[len(ASK_COMMAND) :].strip()
+
+
+def process_ask_background(question: str, chat_id: int) -> None:
+    try:
+        result = get_service().process_ask(question, chat_id)
+    except Exception as exc:
+        send_telegram_message(chat_id, f"Ask failed: {type(exc).__name__}: {exc}")
+        return
+    send_telegram_message(chat_id, _format_answer(result.answer, result.sources))
 
 
 def process_submission_background(text: str, chat_id: int | None) -> None:
@@ -86,20 +113,43 @@ def process_submission_background(text: str, chat_id: int | None) -> None:
             return
         return
 
+    service = get_service()
+    if service.conversations.has(chat_id):
+        try:
+            cont = service.continue_qa(text, chat_id)
+        except Exception as exc:
+            send_telegram_message(chat_id, f"Research failed: {type(exc).__name__}: {exc}")
+            return
+
+        if cont.kind == "saved" and cont.save_result is not None:
+            send_telegram_message(
+                chat_id,
+                f"Saved as a new note instead.\n{_format_save(cont.save_result)}",
+            )
+            return
+        send_telegram_message(chat_id, _format_answer(cont.answer, cont.sources))
+        return
+
     try:
-        result = get_service().process_conversational(text, chat_id)
+        result = service.process_submission(text)
     except Exception as exc:
         send_telegram_message(chat_id, f"Research failed: {type(exc).__name__}: {exc}")
         return
+    send_telegram_message(chat_id, _format_save(result))
 
+
+def _format_answer(answer: str, sources: list[str]) -> str:
+    if not sources:
+        return answer
+    sources_block = "\n".join(f"- {src}" for src in sources)
+    return f"{answer}\n\nSources:\n{sources_block}"
+
+
+def _format_save(result) -> str:
     relative_path = _safe_relative(result.path)
-    header = {
-        "new_topic": f'New note: "{result.title}" ({relative_path})',
-        "refined": f'Updated "{result.title}" ({relative_path})',
-        "failed": f"Problem with that message ({relative_path})",
-    }.get(result.action, relative_path)
-
-    send_telegram_message(chat_id, f"{header}\n\n{result.summary}")
+    if result.success:
+        return f'New note: "{result.title}" ({relative_path})'
+    return f'Problem saving note: {result.error or "unknown"} ({relative_path})'
 
 
 def _safe_relative(path: Path) -> str:

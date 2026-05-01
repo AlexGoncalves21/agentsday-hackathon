@@ -125,7 +125,112 @@ class GeminiResearchClient:
             raise RuntimeError("Gemini returned no source URLs")
         return ResearchDraft(title=title, information=information, sources=sources)
 
-    def route_followup(self, session_title: str, recent_history: str, new_text: str) -> str:
+    def pick_brain_notes(
+        self,
+        question: str,
+        index_md: str,
+        recent_history: str,
+        max_notes: int = 3,
+    ) -> list[str]:
+        if not self.api_key:
+            return []
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError:
+            return []
+
+        client = genai.Client(api_key=self.api_key)
+        prompt = f"""You select notes from a personal compiled second brain to answer a question.
+
+Brain index (markdown):
+---
+{index_md}
+---
+
+Recent Q&A history:
+{recent_history}
+
+Question:
+{question}
+
+Pick up to {max_notes} relative paths from the index that are most likely to contain the answer. Only return paths that appear in the index. If nothing in the index is relevant, return an empty list.
+
+Output format: one path per line, no bullets, no commentary, no prose. Example output:
+concepts/decision-theory.md
+concepts/game-theory.md
+
+If nothing matches, output the single token NONE.
+"""
+        try:
+            response = client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.0),
+            )
+        except Exception:
+            return []
+        text = (getattr(response, "text", "") or "").strip()
+        if not text or text.upper().startswith("NONE"):
+            return []
+        paths: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip().lstrip("-*0123456789. ").strip()
+            if not stripped or stripped.upper() == "NONE":
+                continue
+            if stripped.endswith(".md"):
+                paths.append(stripped)
+        return paths[:max_notes]
+
+    def answer_from_brain(
+        self,
+        question: str,
+        notes: list[tuple[str, str]],
+        recent_history: str,
+    ) -> str:
+        if not self.api_key:
+            raise RuntimeError("GEMINI_API_KEY is not set")
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError as exc:
+            raise RuntimeError("google-genai is not installed") from exc
+
+        client = genai.Client(api_key=self.api_key)
+        notes_block_parts = []
+        for rel_path, content in notes:
+            notes_block_parts.append(f"=== {rel_path} ===\n{content.strip()}")
+        notes_block = "\n\n".join(notes_block_parts) or "(no notes provided)"
+        prompt = f"""You are answering a question using only the user's own compiled second-brain notes.
+
+Notes available to you:
+---
+{notes_block}
+---
+
+Recent Q&A history:
+{recent_history}
+
+Question:
+{question}
+
+Rules:
+- Answer strictly from the supplied notes. Do not add outside knowledge.
+- If the notes do not contain enough to answer, say so clearly and suggest which note(s) might need to be expanded.
+- Be concise. 3-8 sentences is usually right. Use bullets only when the answer is naturally a list.
+- Do not include a Sources section; the caller will append source paths.
+"""
+        response = client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.2),
+        )
+        text = (getattr(response, "text", "") or "").strip()
+        if not text:
+            raise RuntimeError("Gemini returned an empty answer")
+        return text
+
+    def route_qa_message(self, recent_history: str, new_text: str) -> str:
         if not self.api_key:
             return "continue"
         try:
@@ -135,23 +240,22 @@ class GeminiResearchClient:
             return "continue"
 
         client = genai.Client(api_key=self.api_key)
-        prompt = f"""You are a router for a personal research note assistant.
+        prompt = f"""You are routing a message inside an active Q&A session over the user's personal knowledge base.
 
-The user is currently building a note titled: "{session_title}"
-
-Recent conversation:
+Recent Q&A history:
 {recent_history}
 
 New user message:
 {new_text}
 
-Decide whether the new message is FEEDBACK or an ADDITION that refines the current note, or a NEW unrelated topic that should start its own note.
+Decide whether the new message is a CONTINUE (a follow-up question, clarification, or comment about the current Q&A) or a SAVE (the user is now sending a new item they want captured into their knowledge base — a topic, concept name, person, free-form note).
 
 Heuristics:
-- Pure URLs, new question, or new concept name unrelated to the current title -> NEW_TOPIC.
-- "also add", "fix", "no, I meant", "expand on", "wrong", clarifications, follow-up questions about the same subject -> CONTINUE.
+- Questions, "what about", "and how does", "tell me more", "explain", "why" -> CONTINUE.
+- Bare proper nouns like "Demis Hassabis" or "Roman Empire", or sentences phrased as a fact to record -> SAVE.
+- A message that reads like a search query for the existing brain -> CONTINUE.
 
-Reply with exactly one word: CONTINUE or NEW_TOPIC.
+Reply with exactly one word: CONTINUE or SAVE.
 """
         try:
             response = client.models.generate_content(
@@ -160,13 +264,11 @@ Reply with exactly one word: CONTINUE or NEW_TOPIC.
                 config=types.GenerateContentConfig(temperature=0.0),
             )
         except Exception:
-            return "new_topic"
-        text = (getattr(response, "text", "") or "").strip().upper()
-        if "NEW_TOPIC" in text:
-            return "new_topic"
-        if "CONTINUE" in text:
             return "continue"
-        return "new_topic"
+        text = (getattr(response, "text", "") or "").strip().upper()
+        if "SAVE" in text:
+            return "save"
+        return "continue"
 
     def enrich_tweet(self, post: "TweetPost", linked_urls: list[str]) -> ResearchDraft:
         if not self.api_key:
@@ -238,80 +340,6 @@ Rules:
             )
         )
         return ResearchDraft(title=title, information=information, sources=sources)
-
-    def refine(
-        self,
-        current_markdown: str,
-        recent_history: str,
-        feedback: str,
-        existing_sources: list[str],
-    ) -> tuple[ResearchDraft, str]:
-        if not self.api_key:
-            raise RuntimeError("GEMINI_API_KEY is not set")
-        try:
-            from google import genai
-            from google.genai import types
-        except ImportError as exc:
-            raise RuntimeError("google-genai is not installed") from exc
-
-        client = genai.Client(api_key=self.api_key)
-        grounding_tool = types.Tool(google_search=types.GoogleSearch())
-        config = types.GenerateContentConfig(tools=[grounding_tool], temperature=0.2)
-        prompt = f"""You are refining an existing research note based on user feedback.
-
-Existing note (markdown):
----
-{current_markdown}
----
-
-Recent conversation:
-{recent_history}
-
-New user feedback to incorporate:
-{feedback}
-
-Return the FULL updated note in this exact structure:
-
-# Title
-
-## Information
-
-Dense paragraphs and useful bullets, incorporating the user's feedback. Keep prior content unless the user asked to remove or correct it. Use Google Search grounding when the feedback asks for new facts. Include uncertainty when relevant.
-
-## Sources
-
-- https://source.example
-
-After the closing of the markdown note, on a new line, write exactly:
-SUMMARY: <one short sentence describing what changed in this revision>
-
-Do not add YAML frontmatter. Do not include unsupported speculation.
-"""
-        response = client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config=config,
-        )
-        text = (getattr(response, "text", "") or "").strip()
-        if not text:
-            raise RuntimeError("Gemini returned an empty refinement")
-
-        summary_match = re.search(r"^SUMMARY:\s*(.+)$", text, re.MULTILINE)
-        if summary_match:
-            summary = summary_match.group(1).strip()
-            body = text[: summary_match.start()].rstrip()
-        else:
-            summary = "Note updated."
-            body = text
-
-        title, information, inline_sources = _parse_model_markdown(body)
-        sources = list(
-            dict.fromkeys(existing_sources + inline_sources + _grounding_sources(response))
-        )
-        if not sources:
-            sources = list(existing_sources)
-        return ResearchDraft(title=title, information=information, sources=sources), summary
-
 
 def tweet_to_draft(post: TweetPost) -> ResearchDraft:
     info = [

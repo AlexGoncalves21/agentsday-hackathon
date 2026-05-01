@@ -12,6 +12,7 @@ SubmissionType = Literal["x_url", "web_url", "question", "topic_or_concept", "no
 class ResearchConfig:
     input_dir: Path
     runs_dir: Path
+    brain_dir: Path
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
     apify_api_token: str = ""
