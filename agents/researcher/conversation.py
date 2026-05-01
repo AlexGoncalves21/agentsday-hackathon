@@ -1,14 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Literal
-
-from .models import ResearchDraft, SubmissionType
-
-
-ConversationAction = Literal["new_topic", "refined", "failed"]
-RouterDecision = Literal["continue", "new_topic"]
 
 
 @dataclass
@@ -20,10 +13,6 @@ class ConversationTurn:
 @dataclass
 class ConversationSession:
     chat_id: int
-    title: str
-    path: Path
-    draft: ResearchDraft
-    submission_type: SubmissionType
     history: list[ConversationTurn] = field(default_factory=list)
 
     def append(self, role: Literal["user", "assistant"], text: str) -> None:
@@ -38,16 +27,6 @@ class ConversationSession:
             label = "User" if turn.role == "user" else "Assistant"
             lines.append(f"{label}: {turn.text.strip()}")
         return "\n".join(lines)
-
-
-@dataclass(frozen=True)
-class ConversationResult:
-    path: Path
-    title: str
-    action: ConversationAction
-    summary: str
-    success: bool
-    error: str | None = None
 
 
 class ConversationManager:

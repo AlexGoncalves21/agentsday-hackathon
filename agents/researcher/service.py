@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
-from .classifier import classify_submission
+from .brain import BrainReader
+from .classifier import classify_submission, extract_urls
 from .clients import (
     ApifyTweetClient,
     GeminiResearchClient,
@@ -12,10 +15,31 @@ from .clients import (
     tweet_to_draft,
 )
 from .config import load_research_config
-from .conversation import ConversationManager, ConversationResult, ConversationSession
-from .markdown import failure_draft, note_draft, render_markdown, write_input_markdown
+from .conversation import ConversationManager, ConversationSession
+from .markdown import failure_draft, note_draft, write_input_markdown
 from .models import Classification, ResearchConfig, ResearchDraft, ResearchResult
 from .trace import ResearchTraceRecorder
+
+
+AskKind = Literal["answered", "no_match", "error"]
+ContinueKind = Literal["answered", "no_match", "saved", "error"]
+
+
+@dataclass(frozen=True)
+class AskResult:
+    kind: AskKind
+    answer: str
+    sources: list[str] = field(default_factory=list)
+    error: str | None = None
+
+
+@dataclass(frozen=True)
+class ContinueResult:
+    kind: ContinueKind
+    answer: str = ""
+    sources: list[str] = field(default_factory=list)
+    save_result: ResearchResult | None = None
+    error: str | None = None
 
 
 class ResearcherService:
@@ -25,6 +49,7 @@ class ResearcherService:
         self.trace = ResearchTraceRecorder(config.runs_dir)
         self.apify = ApifyTweetClient(config.apify_api_token, config.timeout_seconds)
         self.gemini = GeminiResearchClient(config.gemini_api_key, config.gemini_model, config.timeout_seconds)
+        self.brain = BrainReader(config.brain_dir)
         self.conversations = ConversationManager()
 
     @classmethod
@@ -41,104 +66,142 @@ class ResearcherService:
             error=draft.error,
         )
 
-    def process_conversational(self, text: str, chat_id: int) -> ConversationResult:
+    def process_ask(self, question: str, chat_id: int) -> AskResult:
+        session = ConversationSession(chat_id=chat_id)
+        self.conversations.set(session)
+        result = self._answer_from_brain(question, session)
+        session.append("user", question)
+        session.append("assistant", result.answer)
+        return result
+
+    def continue_qa(self, message: str, chat_id: int) -> ContinueResult:
         session = self.conversations.get(chat_id)
         if session is None:
-            return self._start_topic(text, chat_id)
+            saved = self.process_submission(message)
+            return ContinueResult(kind="saved", save_result=saved)
 
-        decision = self.gemini.route_followup(
-            session_title=session.title,
+        if extract_urls(message):
+            self.conversations.clear(chat_id)
+            saved = self.process_submission(message)
+            self.trace.event(
+                "qa_exit_url",
+                "Q&A exited via URL short-circuit",
+                chat_id=chat_id,
+                output_path=self._repo_rel(saved.path),
+            )
+            return ContinueResult(kind="saved", save_result=saved)
+
+        decision = self.gemini.route_qa_message(
             recent_history=session.recent_history(),
-            new_text=text,
+            new_text=message,
         )
         self.trace.event(
-            "router",
-            "Routed conversational message",
+            "qa_router",
+            "Routed Q&A message",
             chat_id=chat_id,
             decision=decision,
-            session_title=session.title,
         )
-        if decision == "new_topic":
+        if decision == "save":
             self.conversations.clear(chat_id)
-            return self._start_topic(text, chat_id)
-        return self._refine_topic(session, text)
+            saved = self.process_submission(message)
+            return ContinueResult(kind="saved", save_result=saved)
 
-    def reset_conversation(self, chat_id: int) -> None:
+        ask = self._answer_from_brain(message, session)
+        session.append("user", message)
+        session.append("assistant", ask.answer)
+        return ContinueResult(
+            kind=ask.kind,
+            answer=ask.answer,
+            sources=ask.sources,
+            error=ask.error,
+        )
+
+    def clear_qa(self, chat_id: int) -> None:
         self.conversations.clear(chat_id)
 
-    def _start_topic(self, text: str, chat_id: int) -> ConversationResult:
-        draft, path, classification = self._process_and_save(text)
-        summary = _initial_summary(draft)
-
-        if draft.success:
-            session = ConversationSession(
-                chat_id=chat_id,
-                title=draft.title,
-                path=path,
-                draft=draft,
-                submission_type=classification.submission_type,
-            )
-            session.append("user", text)
-            session.append("assistant", summary)
-            self.conversations.set(session)
-
-        return ConversationResult(
-            path=path,
-            title=draft.title,
-            action="new_topic" if draft.success else "failed",
-            summary=summary,
-            success=draft.success,
-            error=draft.error,
-        )
-
-    def _refine_topic(self, session: ConversationSession, text: str) -> ConversationResult:
-        current_markdown = render_markdown(session.draft)
+    def _answer_from_brain(self, question: str, session: ConversationSession) -> AskResult:
         try:
-            new_draft, summary = self.gemini.refine(
-                current_markdown=current_markdown,
-                recent_history=session.recent_history(),
-                feedback=text,
-                existing_sources=list(session.draft.sources),
+            index_md = self.brain.read_index()
+        except FileNotFoundError as exc:
+            return AskResult(
+                kind="error",
+                answer="The brain index is not available yet. Run the Organizer to compile your notes.",
+                sources=[],
+                error=str(exc),
+            )
+
+        history_str = session.recent_history()
+        try:
+            picked = self.gemini.pick_brain_notes(
+                question=question,
+                index_md=index_md,
+                recent_history=history_str,
             )
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
+            self.trace.event("brain_pick_failed", "pick_brain_notes raised", error=error)
+            return AskResult(kind="error", answer=f"Could not look up your brain: {error}", sources=[], error=error)
+
+        available = self.brain.available_paths()
+        valid_paths: list[str] = []
+        for raw in picked:
+            normalized = self.brain.normalize(raw)
+            if normalized in available:
+                valid_paths.append(normalized)
+
+        if not valid_paths:
             self.trace.event(
-                "refine_failed",
-                "Refinement failed",
+                "brain_no_match",
+                "No brain notes selected for question",
                 chat_id=session.chat_id,
-                error=error,
+                picked=list(picked),
             )
-            return ConversationResult(
-                path=session.path,
-                title=session.title,
-                action="failed",
-                summary=f"Could not apply that feedback: {error}",
-                success=False,
-                error=error,
+            return AskResult(
+                kind="no_match",
+                answer="Nothing in your brain matches that yet. Send the topic as a plain message to save a new note for it.",
+                sources=[],
             )
 
-        session.path.write_text(render_markdown(new_draft), encoding="utf-8")
-        session.draft = new_draft
-        session.title = new_draft.title
-        session.append("user", text)
-        session.append("assistant", summary)
-        self.conversations.set(session)
+        notes: list[tuple[str, str]] = []
+        for rel_path in valid_paths:
+            try:
+                content = self.brain.read_note(rel_path)
+            except (FileNotFoundError, ValueError) as exc:
+                self.trace.event(
+                    "brain_read_failed",
+                    "Failed to read picked brain note",
+                    rel_path=rel_path,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+                continue
+            notes.append((rel_path, content))
 
+        if not notes:
+            return AskResult(
+                kind="no_match",
+                answer="Nothing in your brain matches that yet. Send the topic as a plain message to save a new note for it.",
+                sources=[],
+            )
+
+        try:
+            answer = self.gemini.answer_from_brain(
+                question=question,
+                notes=notes,
+                recent_history=history_str,
+            )
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            self.trace.event("brain_answer_failed", "answer_from_brain raised", error=error)
+            return AskResult(kind="error", answer=f"Could not generate an answer: {error}", sources=[], error=error)
+
+        sources = [f"brain/{rel}" for rel, _ in notes]
         self.trace.event(
-            "refined",
-            "Refined existing note",
+            "brain_answered",
+            "Answered from brain",
             chat_id=session.chat_id,
-            output_path=self._repo_rel(session.path),
-            title=new_draft.title,
+            sources=sources,
         )
-
-        return ConversationResult(
-            path=session.path,
-            title=new_draft.title,
-            action="refined",
-            summary=summary,
-            success=True,
-        )
+        return AskResult(kind="answered", answer=answer, sources=sources)
 
     def _process_and_save(self, text: str) -> tuple[ResearchDraft, Path, Classification]:
         timestamp = datetime.now()
@@ -228,16 +291,3 @@ class ResearcherService:
 def _fallback_title(text: str) -> str:
     cleaned = " ".join(text.strip().split())
     return cleaned[:80].rstrip(" .,:;") or "Submission"
-
-
-def _initial_summary(draft: ResearchDraft) -> str:
-    if not draft.success:
-        return f"Saved a failed extraction. Reason: {draft.error or 'unknown'}"
-    info = " ".join(draft.information.split())
-    snippet = info[:280].rstrip()
-    if len(info) > 280:
-        snippet += "..."
-    return (
-        f'Saved "{draft.title}".\n\n{snippet}\n\n'
-        "Reply with feedback to refine this note, or send a new topic to start a fresh one."
-    )

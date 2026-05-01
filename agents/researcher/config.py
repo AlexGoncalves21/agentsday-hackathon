@@ -14,6 +14,7 @@ def load_research_config(workspace: Path) -> ResearchConfig:
     return ResearchConfig(
         input_dir=workspace / "input",
         runs_dir=workspace / "runs",
+        brain_dir=workspace / "brain",
         gemini_api_key=os.environ.get("GEMINI_API_KEY", ""),
         gemini_model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
         apify_api_token=os.environ.get("APIFY_API_TOKEN", ""),

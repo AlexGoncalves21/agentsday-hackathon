@@ -8,6 +8,7 @@ from uuid import uuid4
 from unittest.mock import patch
 
 from agents.organizer.second_brain_agent.markdown import parse_input_document
+from agents.researcher.brain import BrainReader
 from agents.researcher.classifier import classify_submission
 from agents.researcher.clients import TweetPost, tweet_to_draft
 from agents.researcher.markdown import failure_draft, note_draft, render_markdown, write_input_markdown
@@ -88,7 +89,7 @@ class ResearcherServiceTests(unittest.TestCase):
     def test_processes_topic_with_gemini_client(self) -> None:
         workspace = test_workspace()
         try:
-            config = ResearchConfig(input_dir=workspace / "input", runs_dir=workspace / "runs")
+            config = ResearchConfig(input_dir=workspace / "input", runs_dir=workspace / "runs", brain_dir=workspace / "brain")
             service = ResearcherService(config, workspace)
             service.gemini = FakeGemini()  # type: ignore[assignment]
 
@@ -104,7 +105,7 @@ class ResearcherServiceTests(unittest.TestCase):
     def test_processes_x_url_with_exact_post_client(self) -> None:
         workspace = test_workspace()
         try:
-            config = ResearchConfig(input_dir=workspace / "input", runs_dir=workspace / "runs")
+            config = ResearchConfig(input_dir=workspace / "input", runs_dir=workspace / "runs", brain_dir=workspace / "brain")
             service = ResearcherService(config, workspace)
             service.apify = FakeApify(
                 TweetPost(
@@ -128,7 +129,7 @@ class ResearcherServiceTests(unittest.TestCase):
     def test_apify_failure_still_saves_valid_failed_extraction(self) -> None:
         workspace = test_workspace()
         try:
-            config = ResearchConfig(input_dir=workspace / "input", runs_dir=workspace / "runs")
+            config = ResearchConfig(input_dir=workspace / "input", runs_dir=workspace / "runs", brain_dir=workspace / "brain")
             service = ResearcherService(config, workspace)
             service.apify = FakeApify(error=RuntimeError("no exact post"))  # type: ignore[assignment]
 
@@ -138,6 +139,177 @@ class ResearcherServiceTests(unittest.TestCase):
             self.assertFalse(result.success)
             self.assertTrue(document.title.startswith("Failed Extraction:"))
             self.assertEqual(document.sources, ["https://x.com/example/status/123"])
+        finally:
+            cleanup_workspace(workspace)
+
+
+class BrainReaderTests(unittest.TestCase):
+    def _make_brain(self, workspace: Path) -> Path:
+        brain_dir = workspace / "brain"
+        (brain_dir / "concepts").mkdir(parents=True)
+        (brain_dir / "index.md").write_text("# Index\n- concepts/x.md\n", encoding="utf-8")
+        (brain_dir / "concepts" / "x.md").write_text("# X\n\nBody.\n", encoding="utf-8")
+        return brain_dir
+
+    def test_read_index_and_note(self) -> None:
+        workspace = test_workspace()
+        try:
+            brain_dir = self._make_brain(workspace)
+            reader = BrainReader(brain_dir)
+
+            self.assertIn("# Index", reader.read_index())
+            self.assertIn("Body.", reader.read_note("concepts/x.md"))
+            self.assertIn("Body.", reader.read_note("brain/concepts/x.md"))
+            self.assertEqual(reader.available_paths(), {"index.md", "concepts/x.md"})
+        finally:
+            cleanup_workspace(workspace)
+
+    def test_read_note_rejects_path_traversal(self) -> None:
+        workspace = test_workspace()
+        try:
+            brain_dir = self._make_brain(workspace)
+            outside = workspace / "secret.md"
+            outside.write_text("nope", encoding="utf-8")
+            reader = BrainReader(brain_dir)
+
+            with self.assertRaises(ValueError):
+                reader.read_note("../secret.md")
+        finally:
+            cleanup_workspace(workspace)
+
+    def test_read_index_missing_raises(self) -> None:
+        workspace = test_workspace()
+        try:
+            brain_dir = workspace / "brain"
+            brain_dir.mkdir()
+            reader = BrainReader(brain_dir)
+
+            with self.assertRaises(FileNotFoundError):
+                reader.read_index()
+        finally:
+            cleanup_workspace(workspace)
+
+
+class FakeBrainGemini:
+    def __init__(self, picks: list[str], answer: str) -> None:
+        self.picks = picks
+        self.answer = answer
+        self.last_question: str | None = None
+        self.last_notes: list[tuple[str, str]] | None = None
+
+    def pick_brain_notes(self, question: str, index_md: str, recent_history: str, max_notes: int = 3) -> list[str]:
+        self.last_question = question
+        return list(self.picks)
+
+    def answer_from_brain(self, question: str, notes: list[tuple[str, str]], recent_history: str) -> str:
+        self.last_notes = list(notes)
+        return self.answer
+
+    def route_qa_message(self, recent_history: str, new_text: str) -> str:
+        return "continue"
+
+
+class ProcessAskTests(unittest.TestCase):
+    def _make_brain(self, workspace: Path) -> None:
+        brain_dir = workspace / "brain"
+        (brain_dir / "concepts").mkdir(parents=True)
+        (brain_dir / "index.md").write_text(
+            "# Brain Index\n\n## Concepts\n\n- [Decision Theory](concepts/decision-theory.md)\n",
+            encoding="utf-8",
+        )
+        (brain_dir / "concepts" / "decision-theory.md").write_text(
+            "# Decision Theory\n\nA framework for choosing under uncertainty.\n",
+            encoding="utf-8",
+        )
+
+    def _service(self, workspace: Path) -> ResearcherService:
+        config = ResearchConfig(
+            input_dir=workspace / "input",
+            runs_dir=workspace / "runs",
+            brain_dir=workspace / "brain",
+        )
+        return ResearcherService(config, workspace)
+
+    def test_process_ask_answers_with_sources(self) -> None:
+        workspace = test_workspace()
+        try:
+            self._make_brain(workspace)
+            service = self._service(workspace)
+            fake = FakeBrainGemini(
+                picks=["concepts/decision-theory.md"],
+                answer="It's a framework for choosing under uncertainty.",
+            )
+            service.gemini = fake  # type: ignore[assignment]
+
+            result = service.process_ask("what is decision theory?", chat_id=7)
+
+            self.assertEqual(result.kind, "answered")
+            self.assertEqual(result.sources, ["brain/concepts/decision-theory.md"])
+            self.assertIn("framework", result.answer)
+            self.assertIsNotNone(fake.last_notes)
+            assert fake.last_notes is not None
+            self.assertEqual(fake.last_notes[0][0], "concepts/decision-theory.md")
+            self.assertTrue(service.conversations.has(7))
+        finally:
+            cleanup_workspace(workspace)
+
+    def test_process_ask_no_match_keeps_session(self) -> None:
+        workspace = test_workspace()
+        try:
+            self._make_brain(workspace)
+            service = self._service(workspace)
+            service.gemini = FakeBrainGemini(picks=[], answer="(unused)")  # type: ignore[assignment]
+
+            result = service.process_ask("what is k8s?", chat_id=9)
+
+            self.assertEqual(result.kind, "no_match")
+            self.assertEqual(result.sources, [])
+            self.assertTrue(service.conversations.has(9))
+        finally:
+            cleanup_workspace(workspace)
+
+    def test_process_ask_drops_invalid_paths(self) -> None:
+        workspace = test_workspace()
+        try:
+            self._make_brain(workspace)
+            service = self._service(workspace)
+            service.gemini = FakeBrainGemini(
+                picks=["concepts/does-not-exist.md", "../secret.md"],
+                answer="(unused)",
+            )  # type: ignore[assignment]
+
+            result = service.process_ask("anything", chat_id=11)
+
+            self.assertEqual(result.kind, "no_match")
+        finally:
+            cleanup_workspace(workspace)
+
+    def test_continue_qa_routes_url_to_save(self) -> None:
+        workspace = test_workspace()
+        try:
+            self._make_brain(workspace)
+            service = self._service(workspace)
+            fake = FakeBrainGemini(
+                picks=["concepts/decision-theory.md"],
+                answer="answer",
+            )
+
+            class _GeminiWithResearch(FakeBrainGemini):
+                def research(self, text: str, route: str, source_urls: list[str]) -> ResearchDraft:
+                    return ResearchDraft(
+                        title="Web Note",
+                        information=f"Saved {text}",
+                        sources=source_urls or [text],
+                    )
+
+            service.gemini = _GeminiWithResearch(picks=fake.picks, answer=fake.answer)  # type: ignore[assignment]
+
+            service.process_ask("what is decision theory?", chat_id=21)
+            cont = service.continue_qa("https://example.com/article", chat_id=21)
+
+            self.assertEqual(cont.kind, "saved")
+            self.assertIsNotNone(cont.save_result)
+            self.assertFalse(service.conversations.has(21))
         finally:
             cleanup_workspace(workspace)
 
