@@ -99,3 +99,16 @@ The frontend dev server is normally Vite at `http://127.0.0.1:5173/`.
 - `brain/graph_history.json` is intended to hold real graph history, but the UI can simulate frames until real history is meaningful.
 - The UI defensively filters excluded graph nodes even if generation changes.
 
+## Scan Button
+
+The frontend `Scan` button is implemented in Vite middleware in `frontend/vite.config.js` at `/api/scan-input`.
+
+Important details:
+
+- It must run the Organizer with a temporary non-`dev` config (`mode: scan`) so `brain/` is not deleted before adding new input pages.
+- In scan/non-dev mode, Organizer core files such as `index.md`, `README.md`, `changelog.md`, and graph artifacts must be generated from the merged `brain/` directory, not only the current scan batch.
+- Scan must not graph raw input artifacts directly. The Organizer curator should first synthesize durable brain-note titles/slugs, for example turning `X Post by naval: The promise of AI is no UI.` into a concept page such as `AI Is No UI`.
+- Scan must give the Organizer access to existing brain pages when choosing related links. New notes should link to relevant existing notes so graph generation creates edges into the existing network.
+- After a successful Organizer run, processed `input/*.md` files must be deleted. Failed runs should leave inputs in place so they can be fixed and retried.
+- It should find a Python interpreter that can import `yaml`; the Vite/Node PATH may point to Homebrew Python while the shell uses Miniconda.
+- While files are processing, show `Processing new files...` in blue. Do not expose raw messages like `Organizer exited with code 1` in the UI status.

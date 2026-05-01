@@ -1,47 +1,19 @@
 # Run Report
 
-Date: 2026-05-01T12:30:48+01:00
-Mode: `dev`
+Date: 2026-05-01T14:50:57+01:00
+Mode: `scan`
 
 ## Inputs Processed
 
-- input/2026-05-01-agent-frameworks-elixir.md
-- input/2026-05-01-all-tomorrows.md
-- input/2026-05-01-batalha-de-aljubarrota.md
-- input/2026-05-01-decision-theory.md
-- input/2026-05-01-demis-hassabis.md
-- input/2026-05-01-design-patterns.md
-- input/2026-05-01-fibonacci.md
-- input/2026-05-01-game-of-life.md
-- input/2026-05-01-game-theory.md
-- input/2026-05-01-intelligence-vs-agency-karpathy.md
-- input/2026-05-01-lei-de-murphy.md
-- input/2026-05-01-monte-carlo-markov.md
-- input/2026-05-01-multiverse-computing.md
-- input/2026-05-01-self-hosting.md
-- input/2026-05-01-tatica-do-quadrado.md
+- input/2026-05-01-135824-x-post-by-naval-the-promise-of-ai-is-no-ui.md
 
 ## Pages Written
 
-- brain/topics/agent-frameworks-and-elixir-otp.md
-- brain/works/all-tomorrows.md
-- brain/events/batalha-de-aljubarrota.md
-- brain/concepts/decision-theory.md
-- brain/people/demis-hassabis.md
-- brain/concepts/design-patterns.md
-- brain/concepts/fibonacci.md
-- brain/concepts/conways-game-of-life.md
-- brain/concepts/game-theory.md
-- brain/concepts/intelligence-vs-agency.md
-- brain/concepts/lei-de-murphy.md
-- brain/concepts/monte-carlo-and-markov-chains.md
-- brain/companies/multiverse-computing.md
-- brain/concepts/self-hosting.md
-- brain/concepts/tatica-do-quadrado.md
+- brain/concepts/ai-is-no-ui.md
 
 ## Quality Checks
 
-- [x] Every input represented: All inputs have a compiled brain page.
+- [ ] Every input represented: X Post by naval: The promise of AI is no UI.
 - [x] Source summaries created: All inputs have source summary pages.
 - [x] Source URLs preserved: All source URLs are preserved.
 - [x] Core brain files exist: All core files exist.
@@ -55,10 +27,10 @@ Mode: `dev`
 
 ## Graph
 
-- Nodes: 35
-- Edges: 115
-- New nodes: 0
-- Changed nodes: 1
+- Nodes: 16
+- Edges: 42
+- New nodes: 1
+- Changed nodes: 0
 - New edges: 0
 - Removed edges: 0
 
@@ -72,4 +44,4 @@ Mode: `dev`
 
 ## Final Status
 
-Passed
+Passed with warnings

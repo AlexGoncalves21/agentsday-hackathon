@@ -1,22 +1,8 @@
 # Archivist Trace
 
+- Wrote source summary `brain/sources/2026-05-01-135824-x-post-by-naval-the-promise-of-ai-is-no-ui.md`.
 - Wrote README.md and schema.md.
-- Wrote source summary `brain/sources/2026-05-01-agent-frameworks-elixir.md`.
-- Wrote source summary `brain/sources/2026-05-01-all-tomorrows.md`.
-- Wrote source summary `brain/sources/2026-05-01-batalha-de-aljubarrota.md`.
-- Wrote source summary `brain/sources/2026-05-01-decision-theory.md`.
-- Wrote source summary `brain/sources/2026-05-01-demis-hassabis.md`.
-- Wrote source summary `brain/sources/2026-05-01-design-patterns.md`.
-- Wrote source summary `brain/sources/2026-05-01-fibonacci.md`.
-- Wrote source summary `brain/sources/2026-05-01-game-of-life.md`.
-- Wrote source summary `brain/sources/2026-05-01-game-theory.md`.
-- Wrote source summary `brain/sources/2026-05-01-intelligence-vs-agency-karpathy.md`.
-- Wrote source summary `brain/sources/2026-05-01-lei-de-murphy.md`.
-- Wrote source summary `brain/sources/2026-05-01-monte-carlo-markov.md`.
-- Wrote source summary `brain/sources/2026-05-01-multiverse-computing.md`.
-- Wrote source summary `brain/sources/2026-05-01-self-hosting.md`.
-- Wrote source summary `brain/sources/2026-05-01-tatica-do-quadrado.md`.
 - Generated final brain/index.md with core, compiled, and source links.
 - Updated changelog.md.
-- Wrote graph artifacts with 35 nodes, 115 edges, 0 new nodes, 1 changed nodes, and 0 new edges.
+- Wrote graph artifacts with 16 nodes, 42 edges, 1 new nodes, 0 changed nodes, and 0 new edges.
 - Wrote run report to runs/latest_report.md.

@@ -59,8 +59,15 @@ class BrainPage:
 
 
 @dataclass(frozen=True)
+class ExistingBrainPage:
+    title: str
+    category: str
+    slug: str
+    path: Path
+
+
+@dataclass(frozen=True)
 class QualityCheck:
     name: str
     passed: bool
     details: str
-

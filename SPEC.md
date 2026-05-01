@@ -4,7 +4,7 @@
 
 This project is a personal second brain that grows from things sent over Telegram: links, names, concepts, questions, notes, and other fragments worth remembering or researching.
 
-The Researcher receives submissions through Telegram, enriches them when useful, and saves each item as a Markdown file in an append-only input directory. The Organizer periodically compiles those raw inputs into a curated Markdown knowledge base inspired by Karpathy's LLM Wiki pattern: raw sources stay intact, while the wiki is continuously reorganized, cross-linked, linted, and improved by agents.
+The Researcher receives submissions through Telegram, enriches them when useful, and saves each item as a Markdown file in the input directory. The Organizer periodically compiles those raw inputs into a curated Markdown knowledge base inspired by Karpathy's LLM Wiki pattern: source summaries stay intact in the brain after processed input files are deleted, while the wiki is continuously reorganized, cross-linked, linted, and improved by agents.
 
 The goal is not just to store links. The goal is to turn a stream of interesting inputs into a useful, source-backed personal knowledge base.
 
@@ -24,7 +24,7 @@ The goal is not just to store links. The goal is to turn a stream of interesting
   - questions
   - rough notes
   - topics to research later
-- Preserve raw inputs as immutable Markdown files.
+- Preserve processed inputs as durable source summaries.
 - Compile raw inputs into a structured second brain.
 - Improve the second brain through a closed-loop agent process with evaluator sub-agents.
 - Produce a clear hackathon demo that shows ingestion, compilation, quality checks, and final wiki updates.
@@ -289,11 +289,11 @@ loop:
 In `dev` mode:
 
 - Organizer reads every Markdown file in `input/`.
-- Organizer does not delete input files after processing.
 - Organizer rebuilds `brain/` from scratch on every run.
 - Organizer writes a fresh `runs/latest_report.md`.
 - Organizer writes a fresh `runs/trace.jsonl`.
 - Organizer writes sub-agent trace notes under `runs/subagents/`.
+- Organizer deletes input files after they are successfully represented in `brain/` and `brain/sources/`.
 - Organizer does not use previous run reports as context.
 
 This makes the compiler repeatable while prompts, schemas, and writer behavior are being tuned.
@@ -301,7 +301,7 @@ This makes the compiler repeatable while prompts, schemas, and writer behavior a
 In future `prod` mode:
 
 - Organizer can preserve `brain/` and update it incrementally.
-- Organizer can archive or mark processed inputs.
+- Organizer deletes successfully processed inputs after preserving them as source summaries.
 - Organizer still writes run reports.
 - Organizer should avoid rebuilding from scratch unless explicitly configured.
 
@@ -381,13 +381,13 @@ The second brain should be a Markdown wiki.
 : Books, essays, videos, fictional works, papers, and other authored artifacts.
 
 `brain/sources/`
-: Source-level summaries and references back to raw input files.
+: Source-level summaries that preserve the original input content after raw input files are processed and deleted.
 
 ## Source Traceability
 
 Every meaningful claim in the brain should be traceable to a source.
 
-For the MVP, citations can be simple Markdown links to source pages or raw input files:
+For the MVP, citations can be simple Markdown links to source pages:
 
 ```md
 Gemini 3.0 Flash is used as the development model for this project. See [source](../sources/example-source.md).
@@ -584,7 +584,6 @@ Good live Telegram examples:
 ## Open Decisions
 
 - Exact scheduler mechanism for Organizer.
-- Whether future prod mode should archive processed input files, mark them externally, or leave them fully immutable.
 - Whether the brain should use Obsidian-style `[[wiki links]]` or plain Markdown links.
 - Whether source extraction should use dedicated libraries per source type.
 - Whether Telegram should support commands like `/run`, `/status`, and `/ask`.

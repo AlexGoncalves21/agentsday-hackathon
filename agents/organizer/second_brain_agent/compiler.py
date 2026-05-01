@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
 from .config import load_agent_config, load_prompt_config
 from .graph import GraphBuildResult, build_graph_files, load_previous_state
-from .markdown import markdown_list, parse_input_document, relative_markdown_link
-from .models import AgentConfig, BrainPage, InputDocument, PromptConfig, QualityCheck
+from .markdown import markdown_list, parse_input_document, relative_markdown_link, slugify
+from .models import AgentConfig, BrainPage, ExistingBrainPage, InputDocument, PromptConfig, QualityCheck
 from .quality import evaluate_brain
 from .taxonomy import CATEGORIES, category_for, group_by_category, related_slugs_for
 from .trace import TraceRecorder
@@ -51,10 +51,11 @@ class WikiCompiler:
         previous_graph_state = load_previous_state(self.config.paths.brain_dir)
         docs = self._load_inputs()
         self._prepare_output_dirs()
-        pages = self._plan_pages(docs)
-        self._write_base_files(docs)
+        existing_pages = self._existing_brain_pages()
+        pages = self._plan_pages(docs, existing_pages)
         self._write_brain_pages(pages)
         self._write_source_pages(pages)
+        self._write_base_files(docs)
         self._write_index(docs, pages)
         self._write_open_questions(docs, pages)
         self._write_changelog(docs, pages)
@@ -64,6 +65,7 @@ class WikiCompiler:
             self.trace.subagent("critic", f"{check.name}: {'passed' if check.passed else 'failed'} - {check.details}")
         report_path = self._write_run_reports(docs, pages, graph_result, quality_checks)
         self.trace.subagent("archivist", f"Wrote run report to {self._repo_rel(report_path)}.")
+        self._delete_processed_inputs(docs)
         self.trace.flush_subagents()
         self.trace.event("finish", "Finished Organizer run", report=self._repo_rel(report_path))
         return CompileResult(
@@ -114,24 +116,83 @@ class WikiCompiler:
             raise ValueError(f"Refusing to delete unsafe path: {resolved}")
         shutil.rmtree(resolved)
 
-    def _plan_pages(self, docs: List[InputDocument]) -> Dict[str, BrainPage]:
-        pages: Dict[str, BrainPage] = {}
+    def _delete_processed_inputs(self, docs: List[InputDocument]) -> None:
+        input_dir = self.config.paths.input_dir.resolve()
+        deleted = []
         for doc in docs:
-            category = category_for(doc)
-            page_path = self.config.paths.brain_dir / category / f"{doc.slug}.md"
-            pages[doc.slug] = BrainPage(
-                title=doc.title,
+            input_path = doc.path.resolve()
+            if input_path == input_dir or input_dir not in input_path.parents:
+                raise ValueError(f"Refusing to delete unsafe input path: {input_path}")
+            input_path.unlink(missing_ok=True)
+            deleted.append(self._repo_rel(input_path))
+        self.trace.subagent("archivist", f"Deleted {len(deleted)} processed input file(s): {', '.join(deleted)}.")
+
+    def _plan_pages(self, docs: List[InputDocument], existing_pages: Dict[str, ExistingBrainPage]) -> Dict[str, BrainPage]:
+        pages: Dict[str, BrainPage] = {}
+        curated_docs = [self._curate_document(doc) for doc in docs]
+        relation_docs = curated_docs + [
+            InputDocument(
+                path=page.path,
+                title=page.title,
+                information=self._markdown_text(page.path),
+                sources=[],
+                slug=page.slug,
+            )
+            for page in existing_pages.values()
+        ]
+        for doc, curated_doc in zip(docs, curated_docs):
+            category = category_for(curated_doc)
+            page_path = self.config.paths.brain_dir / category / f"{curated_doc.slug}.md"
+            pages[curated_doc.slug] = BrainPage(
+                title=curated_doc.title,
                 category=category,
-                slug=doc.slug,
+                slug=curated_doc.slug,
                 path=page_path,
                 source_doc=doc,
-                related_slugs=related_slugs_for(doc, docs),
+                related_slugs=related_slugs_for(curated_doc, relation_docs),
             )
             self.trace.subagent(
                 "curator",
-                f"Assigned `{doc.title}` to `{category}/{doc.slug}.md`.",
+                f"Assigned `{doc.title}` to `{category}/{curated_doc.slug}.md` as `{curated_doc.title}`.",
             )
         return pages
+
+    def _curate_document(self, doc: InputDocument) -> InputDocument:
+        title = self._curated_title(doc)
+        if title == doc.title:
+            return doc
+        return replace(doc, title=title, slug=slugify(title))
+
+    def _curated_title(self, doc: InputDocument) -> str:
+        lowered_title = doc.title.lower()
+        if lowered_title.startswith(("x post by ", "twitter post by ")):
+            post_text = self._extract_social_post_text(doc.information)
+            if post_text:
+                return self._concept_title_from_sentence(post_text)
+        return doc.title
+
+    def _extract_social_post_text(self, information: str) -> str:
+        lines = information.splitlines()
+        for index, line in enumerate(lines):
+            if line.strip().lower() != "post text:":
+                continue
+            for candidate in lines[index + 1 :]:
+                stripped = candidate.strip()
+                if not stripped:
+                    continue
+                if stripped.lower().startswith("linked or media urls:"):
+                    return ""
+                return stripped
+        return ""
+
+    def _concept_title_from_sentence(self, sentence: str) -> str:
+        cleaned = sentence.strip().strip('"').strip("'").rstrip(".!?")
+        if cleaned.lower() == "the promise of ai is no ui":
+            return "AI Is No UI"
+        words = cleaned.split()
+        if len(words) > 10:
+            cleaned = " ".join(words[:10])
+        return cleaned[:1].upper() + cleaned[1:]
 
     def _write_base_files(self, docs: List[InputDocument]) -> None:
         self._write_readme(docs)
@@ -140,11 +201,12 @@ class WikiCompiler:
 
     def _write_readme(self, docs: List[InputDocument]) -> None:
         brain_dir = self.config.paths.brain_dir
+        input_count = self._brain_input_count(default=len(docs))
         content = f"""# Personal Second Brain
 
 This Markdown wiki was compiled from enriched input files in `{self._repo_rel(self.config.paths.input_dir)}`.
 
-The current build processed {len(docs)} input files. In dev mode, the brain is rebuilt from scratch on every run so the compiler behavior stays repeatable while prompts and schemas evolve.
+The current build includes {input_count} input files. In dev mode, the brain is rebuilt from scratch on every run so the compiler behavior stays repeatable while prompts and schemas evolve.
 
 Start with [index.md](index.md), then browse concepts, people, companies, topics, events, works, and sources.
 """
@@ -169,21 +231,21 @@ Core folders:
 - `projects/`: products, repositories, tools, and initiatives.
 - `events/`: historical events, releases, incidents, and dated milestones.
 - `works/`: books, essays, videos, fictional works, papers, and authored artifacts.
-- `sources/`: one summary per raw input file.
+- `sources/`: one durable summary per processed input file.
 
 Uncertain claims should stay visible and should be carried into `open_questions.md`.
 """
         self._write(self.config.paths.brain_dir / "schema.md", content)
 
     def _write_index(self, docs: List[InputDocument], pages: Dict[str, BrainPage]) -> None:
-        grouped_docs = group_by_category(docs)
         index_path = self.config.paths.brain_dir / "index.md"
+        source_pages = self._source_pages()
         lines = [
             "# Brain Index",
             "",
             "This index is generated at the end of the Organizer build and links to the Markdown files that make up the compiled second brain.",
             "",
-            f"Compiled inputs: {len(docs)}",
+            f"Compiled inputs: {len(source_pages) or len(docs)}",
             "",
             "## Core",
             "",
@@ -197,19 +259,17 @@ Uncertain claims should stay visible and should be carried into `open_questions.
         )
         lines.append("")
         for category in ["topics", "concepts", "people", "companies", "projects", "events", "works"]:
-            category_docs = grouped_docs.get(category, [])
-            if not category_docs:
+            category_pages = self._category_pages(category)
+            if not category_pages:
                 continue
             lines.extend([f"## {category.title()}", ""])
-            for doc in category_docs:
-                page = pages[doc.slug]
-                link = relative_markdown_link(index_path, page.path, page.title)
+            for page_path in category_pages:
+                link = relative_markdown_link(index_path, page_path, self._markdown_title(page_path))
                 lines.append(f"- {link}")
             lines.append("")
         lines.extend(["## Sources", ""])
-        for doc in sorted(docs, key=lambda item: item.title.lower()):
-            source_path = self.config.paths.brain_dir / "sources" / doc.path.name
-            link = relative_markdown_link(index_path, source_path, doc.title)
+        for source_path in source_pages:
+            link = relative_markdown_link(index_path, source_path, self._markdown_title(source_path).replace("Source: ", ""))
             lines.append(f"- {link}")
         self._write(index_path, "\n".join(lines))
         self.trace.subagent("archivist", "Generated final brain/index.md with core, compiled, and source links.")
@@ -230,6 +290,10 @@ Uncertain claims should stay visible and should be carried into `open_questions.
 
     def _write_open_questions(self, docs: List[InputDocument], pages: Dict[str, BrainPage]) -> None:
         questions = []
+        existing_questions = ""
+        questions_path = self.config.paths.brain_dir / "open_questions.md"
+        if self.config.mode != "dev" and questions_path.exists():
+            existing_questions = questions_path.read_text().strip()
         for doc in docs:
             lowered = doc.information.lower()
             if "uncertain" in lowered or "likely" in lowered or "could" in lowered:
@@ -239,7 +303,9 @@ Uncertain claims should stay visible and should be carried into `open_questions.
         if not questions:
             questions.append("- No obvious unresolved questions were detected during this deterministic pass.")
         content = "# Open Questions\n\n" + "\n".join(questions) + "\n"
-        self._write(self.config.paths.brain_dir / "open_questions.md", content)
+        if existing_questions and existing_questions != "# Open Questions":
+            content = existing_questions + "\n\n## Latest Scan\n\n" + "\n".join(questions) + "\n"
+        self._write(questions_path, content)
         self.trace.subagent("critic", f"Collected {len(questions)} open-question notes.")
 
     def _write_changelog(self, docs: List[InputDocument], pages: Dict[str, BrainPage]) -> None:
@@ -250,18 +316,23 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             f"## {now}",
             "",
             f"- Mode: `{self.config.mode}`.",
-            f"- Rebuilt brain from {len(docs)} input files.",
+            f"- Processed {len(docs)} input files.",
             f"- Wrote {len(pages)} compiled pages and {len(docs)} source summaries.",
             "- Updated index, schema, open questions, changelog, and run report.",
         ]
-        self._write(self.config.paths.brain_dir / "changelog.md", "\n".join(lines) + "\n")
+        changelog_path = self.config.paths.brain_dir / "changelog.md"
+        if self.config.mode != "dev" and changelog_path.exists():
+            existing = changelog_path.read_text().strip()
+            content = "\n".join(lines) + "\n\n" + "\n".join(existing.splitlines()[1:]).strip() + "\n"
+        else:
+            content = "\n".join(lines) + "\n"
+        self._write(changelog_path, content)
         self.trace.subagent("archivist", "Updated changelog.md.")
 
     def _write_brain_pages(self, pages: Dict[str, BrainPage]) -> None:
         for page in pages.values():
             doc = page.source_doc
             source_page = self.config.paths.brain_dir / "sources" / doc.path.name
-            input_link = relative_markdown_link(page.path, doc.path, doc.path.name)
             source_summary_link = relative_markdown_link(page.path, source_page, "source summary")
             related_links = self._related_links(page, pages)
             lines = [
@@ -273,7 +344,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
                 "",
                 "## Source Trace",
                 "",
-                f"- Input file: {input_link}",
+                f"- Original input file: `{doc.path.name}`",
                 f"- Source summary: {source_summary_link}",
                 "",
                 "## Sources",
@@ -293,12 +364,11 @@ Uncertain claims should stay visible and should be carried into `open_questions.
             doc = page.source_doc
             source_path = self.config.paths.brain_dir / "sources" / doc.path.name
             compiled_link = relative_markdown_link(source_path, page.path, page.title)
-            input_link = relative_markdown_link(source_path, doc.path, doc.path.name)
             content = f"""# Source: {doc.title}
 
 ## Input
 
-- {input_link}
+- Original input file: `{doc.path.name}`
 
 ## Compiled Into
 
@@ -379,11 +449,62 @@ Mode: `{self.config.mode}`
 
     def _related_links(self, page: BrainPage, pages: Dict[str, BrainPage]) -> List[str]:
         links = []
+        existing_pages = self._existing_brain_pages()
         for slug in page.related_slugs:
             related = pages.get(slug)
             if related:
                 links.append(relative_markdown_link(page.path, related.path, related.title))
+                continue
+            existing = existing_pages.get(slug)
+            if existing:
+                links.append(relative_markdown_link(page.path, existing.path, existing.title))
         return links
+
+    def _existing_brain_pages(self) -> Dict[str, ExistingBrainPage]:
+        pages: Dict[str, ExistingBrainPage] = {}
+        if self.config.mode == "dev":
+            return pages
+        for category in ["topics", "concepts", "people", "companies", "projects", "events", "works"]:
+            for path in self._category_pages(category):
+                slug = path.stem
+                pages[slug] = ExistingBrainPage(
+                    title=self._markdown_title(path),
+                    category=category,
+                    slug=slug,
+                    path=path,
+                )
+        return pages
+
+    def _brain_input_count(self, default: int) -> int:
+        source_pages = self._source_pages()
+        return len(source_pages) if source_pages else default
+
+    def _category_pages(self, category: str) -> List[Path]:
+        category_dir = self.config.paths.brain_dir / category
+        if not category_dir.exists():
+            return []
+        return sorted(category_dir.glob("*.md"), key=lambda path: self._markdown_title(path).lower())
+
+    def _source_pages(self) -> List[Path]:
+        source_dir = self.config.paths.brain_dir / "sources"
+        if not source_dir.exists():
+            return []
+        return sorted(source_dir.glob("*.md"), key=lambda path: self._markdown_title(path).lower())
+
+    def _markdown_title(self, path: Path) -> str:
+        try:
+            for line in path.read_text().splitlines():
+                if line.startswith("# "):
+                    return line[2:].strip()
+        except FileNotFoundError:
+            return path.stem.replace("-", " ").title()
+        return path.stem.replace("-", " ").title()
+
+    def _markdown_text(self, path: Path) -> str:
+        try:
+            return path.read_text()
+        except FileNotFoundError:
+            return ""
 
     def _repo_rel(self, path: Path) -> str:
         return path.resolve().relative_to(self.workspace.resolve()).as_posix()

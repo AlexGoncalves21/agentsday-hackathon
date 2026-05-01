@@ -145,6 +145,12 @@ button:disabled {
   padding: 5px 9px;
 }
 
+.stats-strip .scan-status-info {
+  background: #e7f1fb;
+  border-color: #bdd7ee;
+  color: #1f6fa8;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;

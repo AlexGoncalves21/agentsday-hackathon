@@ -1,6 +1,7 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
@@ -10,6 +11,7 @@ const repoRoot = path.resolve(__dirname, '..')
 const brainRoot = path.resolve(repoRoot, 'brain')
 const inputRoot = path.resolve(repoRoot, 'input')
 const graphPath = path.resolve(brainRoot, 'graph.json')
+let organizerPython = null
 
 function brainStaticPlugin() {
   return {
@@ -46,9 +48,20 @@ function brainStaticPlugin() {
 }
 
 function handleScanInput(req, res) {
+  if (req.method === 'GET') {
+    const pendingInputs = pendingInputFiles()
+    sendJson(res, {
+      pendingInputs,
+      message: pendingInputs.length
+        ? `Found ${pendingInputs.length} new input file${pendingInputs.length === 1 ? '' : 's'}.`
+        : 'No new input Markdown files found.',
+    })
+    return
+  }
+
   if (req.method !== 'POST') {
     res.statusCode = 405
-    res.setHeader('allow', 'POST')
+    res.setHeader('allow', 'GET, POST')
     res.end('Method not allowed')
     return
   }
@@ -73,7 +86,7 @@ function handleScanInput(req, res) {
       sendJson(res, {
         processed: false,
         pendingInputs,
-        message: error.message,
+        message: 'Processing new files...',
         output: error.output || '',
       })
     })
@@ -95,7 +108,15 @@ function pendingInputFiles() {
 
 function runOrganizer() {
   return new Promise((resolve, reject) => {
-    const child = spawn('python3', ['-m', 'agents.organizer.second_brain_agent', 'run'], {
+    const configPath = writeScanConfig()
+    const python = pythonForOrganizer()
+    if (!python) {
+      const error = new Error('Could not find a Python interpreter with PyYAML installed.')
+      error.output = ''
+      reject(error)
+      return
+    }
+    const child = spawn(python, ['-m', 'agents.organizer.second_brain_agent', 'run', '--config', configPath], {
       cwd: repoRoot,
       env: process.env,
     })
@@ -112,14 +133,59 @@ function runOrganizer() {
     })
     child.on('close', (code) => {
       if (code === 0) {
+        fs.rmSync(configPath, { force: true })
         resolve({ output })
         return
       }
+      fs.rmSync(configPath, { force: true })
       const error = new Error(`Organizer exited with code ${code}`)
       error.output = output
       reject(error)
     })
   })
+}
+
+function pythonForOrganizer() {
+  if (organizerPython) return organizerPython
+  const loginShellPython = spawnSync('/bin/zsh', ['-lc', 'command -v python3'], { encoding: 'utf8' }).stdout.trim()
+  const candidates = [
+    process.env.ORGANIZER_PYTHON,
+    process.env.PYTHON,
+    path.join(os.homedir(), 'miniconda3/bin/python3'),
+    path.join(os.homedir(), 'anaconda3/bin/python3'),
+    path.join(repoRoot, '.venv/bin/python'),
+    path.join(repoRoot, '.venv/bin/python3'),
+    loginShellPython,
+    'python3',
+  ].filter(Boolean)
+
+  organizerPython = candidates.find((candidate) => {
+    const check = spawnSync(candidate, ['-c', 'import yaml'], { cwd: repoRoot, encoding: 'utf8' })
+    return check.status === 0
+  })
+  return organizerPython
+}
+
+function writeScanConfig() {
+  const configPath = path.join(os.tmpdir(), `agentsday-scan-${Date.now()}.yaml`)
+  fs.writeFileSync(
+    configPath,
+    `mode: scan
+
+paths:
+  input_dir: input
+  brain_dir: brain
+  runs_dir: runs
+
+model:
+  provider: gemini
+  name: gemini-3-flash-preview
+
+loop:
+  max_iterations: 3
+`,
+  )
+  return configPath
 }
 
 function sendJson(res, payload) {

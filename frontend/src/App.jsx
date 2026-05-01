@@ -132,7 +132,7 @@ export default function App() {
   const [isPanning, setIsPanning] = useState(false)
   const [displayNodes, setDisplayNodes] = useState([])
   const [error, setError] = useState(null)
-  const [scanState, setScanState] = useState({ running: false, message: '' })
+  const [scanState, setScanState] = useState({ running: false, message: '', tone: 'neutral' })
   const [previousGraphState] = useState(() => loadStoredGraphState())
 
   async function loadGraph() {
@@ -339,19 +339,33 @@ export default function App() {
 
   async function scanInput() {
     if (scanState.running) return
-    setScanState({ running: true, message: 'Scanning input...' })
+    setScanState({ running: true, message: 'Scanning input...', tone: 'neutral' })
     try {
+      const pendingResponse = await fetch('/api/scan-input', { cache: 'no-store' })
+      const pendingResult = await pendingResponse.json()
+      const hasPendingInputs = pendingResult.pendingInputs?.length > 0
+      if (hasPendingInputs) {
+        setScanState({ running: true, message: 'Processing new files...', tone: 'info' })
+      }
+
       const response = await fetch('/api/scan-input', { method: 'POST' })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.message || 'Scan failed.')
+      if (!response.ok) {
+        setScanState({
+          running: false,
+          message: hasPendingInputs ? 'Processing failed. Check the input file format.' : result.message || 'Scan failed.',
+          tone: 'neutral',
+        })
+        return
+      }
       const loaded = await loadGraph()
       if (result.processed && loaded) {
         setEvolutionMode(true)
         setCurrentGraphIndex(Math.max(loaded.historyGraphs.length - 1, 0))
       }
-      setScanState({ running: false, message: result.message })
+      setScanState({ running: false, message: result.message, tone: result.processed ? 'info' : 'neutral' })
     } catch (scanError) {
-      setScanState({ running: false, message: scanError.message })
+      setScanState({ running: false, message: scanError.message, tone: 'neutral' })
     }
   }
 
@@ -463,7 +477,7 @@ export default function App() {
             Graph {currentGraphIndex + 1} / {Math.max(graphHistory.length, 1)}
           </span>
         ) : null}
-        {scanState.message ? <span>{scanState.message}</span> : null}
+        {scanState.message ? <span className={`scan-status scan-status-${scanState.tone}`}>{scanState.message}</span> : null}
       </section>
 
       <section className="workspace">

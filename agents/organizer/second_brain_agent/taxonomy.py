@@ -98,16 +98,55 @@ def related_slugs_for(document: InputDocument, all_documents: Iterable[InputDocu
     heuristic = [
         other.slug
         for other in all_documents
-        if other.slug != document.slug and _shares_interesting_word(document.title, other.title)
+        if other.slug != document.slug and _is_related(document, other)
     ]
     return list(dict.fromkeys(explicit + heuristic))
 
 
+def _is_related(left: InputDocument, right: InputDocument) -> bool:
+    left_terms = _interesting_words(" ".join([left.title, left.information]))
+    right_terms = _interesting_words(" ".join([right.title, right.information]))
+    return len(left_terms & right_terms) >= 2 or bool(_expanded_terms(left_terms) & right_terms)
+
+
 def _shares_interesting_word(left: str, right: str) -> bool:
-    stopwords = {"and", "the", "of", "de", "do", "da", "e"}
-    left_words = {word for word in left.lower().replace("/", " ").split() if word not in stopwords}
-    right_words = {word for word in right.lower().replace("/", " ").split() if word not in stopwords}
-    return bool(left_words & right_words)
+    return bool(_interesting_words(left) & _interesting_words(right))
+
+
+def _interesting_words(value: str) -> set[str]:
+    stopwords = {
+        "and",
+        "the",
+        "of",
+        "de",
+        "do",
+        "da",
+        "e",
+        "is",
+        "no",
+        "a",
+        "an",
+        "to",
+        "in",
+        "for",
+        "by",
+        "with",
+        "from",
+        "post",
+        "source",
+        "information",
+    }
+    normalized = value.lower().replace("/", " ").replace("-", " ")
+    return {word.strip(".,:;!?()[]`'\"") for word in normalized.split() if word not in stopwords and len(word) > 1}
+
+
+def _expanded_terms(terms: set[str]) -> set[str]:
+    expanded = set()
+    if "ai" in terms:
+        expanded.update({"agent", "agents", "agency", "intelligence", "automation", "llm", "model"})
+    if "ui" in terms:
+        expanded.update({"interface", "interfaces", "software", "tooling"})
+    return expanded
 
 
 def group_by_category(documents: Iterable[InputDocument]) -> Dict[str, List[InputDocument]]:
@@ -115,4 +154,3 @@ def group_by_category(documents: Iterable[InputDocument]) -> Dict[str, List[Inpu
     for document in sorted(documents, key=lambda item: item.title.lower()):
         grouped.setdefault(category_for(document), []).append(document)
     return grouped
-

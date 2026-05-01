@@ -1,5 +1,5 @@
 {
-  "build_id": "e33571bdda5e1183",
+  "build_id": "7c9d92e6b8d6c7e9",
   "edges": {
     "companies/multiverse-computing.md->concepts/intelligence-vs-agency.md": {
       "hash": "9b7446d7a44c2325"
@@ -106,30 +106,6 @@
     "events/batalha-de-aljubarrota.md->concepts/tatica-do-quadrado.md": {
       "hash": "f8ba2aade6c11935"
     },
-    "open_questions.md->concepts/decision-theory.md": {
-      "hash": "99e68bda8f891aae"
-    },
-    "open_questions.md->concepts/game-theory.md": {
-      "hash": "18911fc1ff09230f"
-    },
-    "open_questions.md->concepts/intelligence-vs-agency.md": {
-      "hash": "d1027fdc31f0dba2"
-    },
-    "open_questions.md->concepts/lei-de-murphy.md": {
-      "hash": "6cc99440cd934ff6"
-    },
-    "open_questions.md->concepts/monte-carlo-and-markov-chains.md": {
-      "hash": "10da3c7a5fdc3d4c"
-    },
-    "open_questions.md->concepts/self-hosting.md": {
-      "hash": "9c07739b4109fae3"
-    },
-    "open_questions.md->concepts/tatica-do-quadrado.md": {
-      "hash": "117ef9a983f2736b"
-    },
-    "open_questions.md->people/demis-hassabis.md": {
-      "hash": "64700a8826756158"
-    },
     "people/demis-hassabis.md->concepts/decision-theory.md": {
       "hash": "42d5647dc7902737"
     },
@@ -152,7 +128,7 @@
       "hash": "8ecad21b4da623c8"
     }
   },
-  "generated_at": "2026-05-01T12:34:42+00:00",
+  "generated_at": "2026-05-01T13:51:30+00:00",
   "nodes": {
     "companies/multiverse-computing.md": {
       "hash": "5cc3f6a762becc0e"
@@ -189,9 +165,6 @@
     },
     "events/batalha-de-aljubarrota.md": {
       "hash": "8ed2a3d7241895ef"
-    },
-    "open_questions.md": {
-      "hash": "a5fcfe1f5d2bc82b"
     },
     "people/demis-hassabis.md": {
       "hash": "e217bd9900bb3578"

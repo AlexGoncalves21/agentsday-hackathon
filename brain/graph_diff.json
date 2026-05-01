@@ -1,15 +1,12 @@
 {
-  "build_id": "e33571bdda5e1183",
+  "build_id": "7c9d92e6b8d6c7e9",
   "changed_nodes": [],
-  "generated_at": "2026-05-01T12:34:42+00:00",
+  "generated_at": "2026-05-01T13:51:30+00:00",
   "new_edges": [],
   "new_nodes": [],
-  "previous_build_id": "c9cedab74ae45974",
+  "previous_build_id": "744622ed4cd16df8",
   "removed_edges": [],
-  "removed_nodes": [
-    "README.md",
-    "schema.md"
-  ],
+  "removed_nodes": [],
   "unchanged_nodes": [
     "companies/multiverse-computing.md",
     "concepts/conways-game-of-life.md",
@@ -23,7 +20,6 @@
     "concepts/self-hosting.md",
     "concepts/tatica-do-quadrado.md",
     "events/batalha-de-aljubarrota.md",
-    "open_questions.md",
     "people/demis-hassabis.md",
     "topics/agent-frameworks-and-elixir-otp.md",
     "works/all-tomorrows.md"

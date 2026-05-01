@@ -51,7 +51,7 @@ Compile the personal second brain in this workspace.
 Read every Markdown file from input/.
 In dev mode, rebuild brain/ from scratch.
 Write a fresh report to runs/latest_report.md.
-Do not delete inputs.
+Delete each input Markdown file after it has been successfully represented in brain/ and summarized under brain/sources/.
 Do not use previous run reports as context.
 """
     result = agent.invoke({"messages": [{"role": "user", "content": user_prompt.strip()}]})

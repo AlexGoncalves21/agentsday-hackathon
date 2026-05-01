@@ -1,5 +1,5 @@
 {
-  "build_id": "e33571bdda5e1183",
+  "build_id": "7c9d92e6b8d6c7e9",
   "edges": [
     {
       "hash": "9b7446d7a44c2325",
@@ -282,70 +282,6 @@
       "type": "markdown_link"
     },
     {
-      "hash": "99e68bda8f891aae",
-      "id": "open_questions.md->concepts/decision-theory.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "concepts/decision-theory.md",
-      "type": "markdown_link"
-    },
-    {
-      "hash": "18911fc1ff09230f",
-      "id": "open_questions.md->concepts/game-theory.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "concepts/game-theory.md",
-      "type": "markdown_link"
-    },
-    {
-      "hash": "d1027fdc31f0dba2",
-      "id": "open_questions.md->concepts/intelligence-vs-agency.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "concepts/intelligence-vs-agency.md",
-      "type": "markdown_link"
-    },
-    {
-      "hash": "6cc99440cd934ff6",
-      "id": "open_questions.md->concepts/lei-de-murphy.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "concepts/lei-de-murphy.md",
-      "type": "markdown_link"
-    },
-    {
-      "hash": "10da3c7a5fdc3d4c",
-      "id": "open_questions.md->concepts/monte-carlo-and-markov-chains.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "concepts/monte-carlo-and-markov-chains.md",
-      "type": "markdown_link"
-    },
-    {
-      "hash": "9c07739b4109fae3",
-      "id": "open_questions.md->concepts/self-hosting.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "concepts/self-hosting.md",
-      "type": "markdown_link"
-    },
-    {
-      "hash": "117ef9a983f2736b",
-      "id": "open_questions.md->concepts/tatica-do-quadrado.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "concepts/tatica-do-quadrado.md",
-      "type": "markdown_link"
-    },
-    {
-      "hash": "64700a8826756158",
-      "id": "open_questions.md->people/demis-hassabis.md",
-      "source": "open_questions.md",
-      "status": "unchanged",
-      "target": "people/demis-hassabis.md",
-      "type": "markdown_link"
-    },
-    {
       "hash": "42d5647dc7902737",
       "id": "people/demis-hassabis.md->concepts/decision-theory.md",
       "source": "people/demis-hassabis.md",
@@ -402,7 +338,7 @@
       "type": "markdown_link"
     }
   ],
-  "generated_at": "2026-05-01T12:34:42+00:00",
+  "generated_at": "2026-05-01T13:51:30+00:00",
   "nodes": [
     {
       "hash": "5cc3f6a762becc0e",
@@ -511,15 +447,6 @@
       "status": "unchanged",
       "summary": "A Batalha de Aljubarrota foi travada em 14 de agosto de 1385 entre o Reino de Portugal e a Coroa de Castela. A batalha foi decisiva para consolidar a independencia portuguesa durante a crise de 1383-1385. As forcas portuguesas, lideradas p...",
       "type": "event"
-    },
-    {
-      "hash": "a5fcfe1f5d2bc82b",
-      "id": "open_questions.md",
-      "label": "Open Questions",
-      "path": "brain/open_questions.md",
-      "status": "unchanged",
-      "summary": "- Review uncertainty in [Decision Theory](concepts/decision-theory.md). - Review uncertainty in [Demis Hassabis](people/demis-hassabis.md). - Review uncertainty in [Game Theory](concepts/game-theory.md). - Review uncertainty in [Intelligen...",
-      "type": "core"
     },
     {
       "hash": "e217bd9900bb3578",
