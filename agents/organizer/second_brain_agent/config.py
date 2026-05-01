@@ -22,7 +22,7 @@ def _resolve_path(workspace: Path, value: str) -> Path:
 
 
 def load_agent_config(config_path: Path, workspace: Path) -> AgentConfig:
-    data = _require_mapping(yaml.safe_load(config_path.read_text()) or {}, str(config_path))
+    data = _require_mapping(yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}, str(config_path))
     paths = _require_mapping(data.get("paths"), "paths")
     model = _require_mapping(data.get("model"), "model")
     loop = _require_mapping(data.get("loop", {}), "loop")
@@ -46,7 +46,7 @@ def load_agent_config(config_path: Path, workspace: Path) -> AgentConfig:
 
 
 def load_prompt_config(prompt_path: Path) -> PromptConfig:
-    data = _require_mapping(yaml.safe_load(prompt_path.read_text()) or {}, str(prompt_path))
+    data = _require_mapping(yaml.safe_load(prompt_path.read_text(encoding="utf-8")) or {}, str(prompt_path))
     return PromptConfig(
         system=str(data.get("system", "")),
         input_contract=str(data.get("input_contract", "")),

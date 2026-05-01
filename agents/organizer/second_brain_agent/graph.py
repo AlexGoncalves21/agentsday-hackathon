@@ -37,7 +37,7 @@ def load_previous_state(brain_dir: Path) -> Dict[str, Any]:
     if not state_path.exists():
         return {"nodes": {}, "edges": {}}
     try:
-        return json.loads(state_path.read_text())
+        return json.loads(state_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {"nodes": {}, "edges": {}}
 
@@ -85,7 +85,7 @@ def _build_nodes(brain_dir: Path, previous_state: Dict[str, Any]) -> List[Dict[s
         rel = _rel(path, brain_dir)
         if _is_excluded_graph_node(rel):
             continue
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         digest = _hash_text(text)
         previous = previous_nodes.get(rel)
         if not previous:
@@ -166,7 +166,7 @@ def _normalize_planned_link(link: Any) -> Dict[str, Any]:
 
 
 def _extract_internal_links(source_path: Path, brain_dir: Path, node_ids: set[str]) -> Iterable[Tuple[str, str]]:
-    text = source_path.read_text()
+    text = source_path.read_text(encoding="utf-8")
     for raw_target in MARKDOWN_LINK_RE.findall(text):
         target = raw_target.split("#", 1)[0].strip()
         if not target or "://" in target or not target.endswith(".md"):
@@ -235,14 +235,14 @@ def _state_payload(
 
 
 def _write_json(path: Path, payload: Dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def _append_history(path: Path, graph: Dict[str, Any]) -> None:
     history: Dict[str, Any] = {"graphs": []}
     if path.exists():
         try:
-            history = json.loads(path.read_text())
+            history = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             history = {"graphs": []}
 

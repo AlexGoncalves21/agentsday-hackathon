@@ -432,7 +432,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
         existing_questions = ""
         questions_path = self.config.paths.brain_dir / "open_questions.md"
         if self.config.mode != "dev" and questions_path.exists():
-            existing_questions = questions_path.read_text().strip()
+            existing_questions = questions_path.read_text(encoding="utf-8").strip()
         for doc in docs:
             lowered = doc.information.lower()
             if "uncertain" in lowered or "likely" in lowered or "could" in lowered:
@@ -463,7 +463,7 @@ Uncertain claims should stay visible and should be carried into `open_questions.
         ]
         changelog_path = self.config.paths.brain_dir / "changelog.md"
         if self.config.mode != "dev" and changelog_path.exists():
-            existing = changelog_path.read_text().strip()
+            existing = changelog_path.read_text(encoding="utf-8").strip()
             content = "\n".join(lines) + "\n\n" + "\n".join(existing.splitlines()[1:]).strip() + "\n"
         else:
             content = "\n".join(lines) + "\n"
@@ -681,7 +681,7 @@ Mode: `{self.config.mode}`
 
     def _markdown_title(self, path: Path) -> str:
         try:
-            for line in path.read_text().splitlines():
+            for line in path.read_text(encoding="utf-8").splitlines():
                 if line.startswith("# "):
                     return line[2:].strip()
         except FileNotFoundError:
@@ -690,7 +690,7 @@ Mode: `{self.config.mode}`
 
     def _markdown_text(self, path: Path) -> str:
         try:
-            return path.read_text()
+            return path.read_text(encoding="utf-8")
         except FileNotFoundError:
             return ""
 
@@ -699,4 +699,4 @@ Mode: `{self.config.mode}`
 
     def _write(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content.rstrip() + "\n")
+        path.write_text(content.rstrip() + "\n", encoding="utf-8")

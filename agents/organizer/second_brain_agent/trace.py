@@ -16,7 +16,7 @@ class TraceRecorder:
     def reset(self) -> None:
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         self.subagents_dir.mkdir(parents=True, exist_ok=True)
-        self.trace_path.write_text("")
+        self.trace_path.write_text("", encoding="utf-8")
         for path in self.subagents_dir.glob("*.md"):
             path.unlink()
         self._subagent_notes = {}
@@ -28,8 +28,8 @@ class TraceRecorder:
             "message": message,
             "data": data,
         }
-        with self.trace_path.open("a") as handle:
-            handle.write(json.dumps(payload, sort_keys=True) + "\n")
+        with self.trace_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True, ensure_ascii=False) + "\n")
 
     def subagent(self, name: str, note: str) -> None:
         self._subagent_notes.setdefault(name, []).append(note)
@@ -39,5 +39,5 @@ class TraceRecorder:
         for name, notes in sorted(self._subagent_notes.items()):
             lines = [f"# {name.title()} Trace", ""]
             lines.extend(f"- {note}" for note in notes)
-            (self.subagents_dir / f"{name}.md").write_text("\n".join(lines).rstrip() + "\n")
+            (self.subagents_dir / f"{name}.md").write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 

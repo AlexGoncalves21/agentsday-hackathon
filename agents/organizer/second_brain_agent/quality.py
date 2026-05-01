@@ -48,7 +48,7 @@ def _check_source_urls_preserved(brain_dir: Path, docs: List[InputDocument]) -> 
     missing = []
     for doc in docs:
         source_page = brain_dir / "sources" / doc.path.name
-        text = source_page.read_text() if source_page.exists() else ""
+        text = source_page.read_text(encoding="utf-8") if source_page.exists() else ""
         for source in doc.sources:
             if source not in text:
                 missing.append(f"{doc.path.name}: {source}")
@@ -83,7 +83,7 @@ def _check_index_links(
     docs: Iterable[InputDocument],
 ) -> QualityCheck:
     index_path = brain_dir / "index.md"
-    index_text = index_path.read_text() if index_path.exists() else ""
+    index_text = index_path.read_text(encoding="utf-8") if index_path.exists() else ""
     expected = ["README.md", "schema.md", "open_questions.md", "changelog.md", "graph.json", "graph_diff.json"]
     expected.extend(page.path.name for page in pages)
     expected.extend(doc.path.name for doc in docs)
