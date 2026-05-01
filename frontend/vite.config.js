@@ -206,10 +206,18 @@ function runOrganizer() {
 
 function pythonForOrganizer() {
   if (organizerPython) return organizerPython
-  const loginShellPython = spawnSync('/bin/zsh', ['-lc', 'command -v python3'], { encoding: 'utf8' }).stdout.trim()
-  const candidates = [
-    process.env.ORGANIZER_PYTHON,
-    process.env.PYTHON,
+
+  const isWindows = process.platform === 'win32'
+  let loginShellPython = ''
+  if (!isWindows) {
+    try {
+      loginShellPython = spawnSync('/bin/zsh', ['-lc', 'command -v python3'], { encoding: 'utf8' }).stdout.trim()
+    } catch {
+      loginShellPython = ''
+    }
+  }
+
+  const unixCandidates = [
     path.join(os.homedir(), 'miniconda3/bin/python3'),
     path.join(os.homedir(), 'anaconda3/bin/python3'),
     path.join(repoRoot, '.venv/bin/python'),
@@ -218,6 +226,20 @@ function pythonForOrganizer() {
     'python3.11',
     loginShellPython,
     'python3',
+  ]
+  const windowsCandidates = [
+    path.join(repoRoot, '.venv/Scripts/python.exe'),
+    path.join(os.homedir(), 'miniconda3/python.exe'),
+    path.join(os.homedir(), 'anaconda3/python.exe'),
+    'python.exe',
+    'python',
+    'py',
+  ]
+
+  const candidates = [
+    process.env.ORGANIZER_PYTHON,
+    process.env.PYTHON,
+    ...(isWindows ? windowsCandidates : unixCandidates),
   ].filter(Boolean)
 
   organizerPython = candidates.find((candidate) => {
