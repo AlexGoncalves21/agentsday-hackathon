@@ -22,7 +22,7 @@ def slugify(value: str) -> str:
 
 
 def parse_input_document(path: Path) -> InputDocument:
-    lines = path.read_text().splitlines()
+    lines = path.read_text(encoding="utf-8").splitlines()
     if not lines or not lines[0].startswith("# "):
         raise InputParseError(f"{path} must start with '# Title'")
 

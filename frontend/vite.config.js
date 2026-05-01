@@ -44,7 +44,7 @@ function brainStaticPlugin() {
           return
         }
 
-        if (filePath.endsWith('.json')) res.setHeader('content-type', 'application/json')
+        if (filePath.endsWith('.json')) res.setHeader('content-type', 'application/json; charset=utf-8')
         if (filePath.endsWith('.md')) res.setHeader('content-type', 'text/markdown; charset=utf-8')
         fs.createReadStream(filePath).pipe(res)
       })
