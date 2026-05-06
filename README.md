@@ -1,32 +1,18 @@
 # Second Brain Agents
 
-`LangChain` `Deep Agents SDK` `Cloudflare Tunnels`
+<p>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat&logo=python&logoColor=white&labelColor=555555">
+  <img alt="Deep Agents SDK" src="https://img.shields.io/badge/Deep%20Agents-SDK-1f6feb?style=flat&labelColor=555555">
+  <img alt="LangSmith traces" src="https://img.shields.io/badge/LangSmith-Traces-111827?style=flat&labelColor=555555">
+  <img alt="React Vite UI" src="https://img.shields.io/badge/React-Vite%20UI-61DAFB?style=flat&logo=react&logoColor=white&labelColor=555555">
+  <img alt="Cloudflare Tunnel" src="https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=flat&logo=cloudflare&logoColor=white&labelColor=555555">
+</p>
 
-Second Brain Agents turns incoming Markdown files into a browsable personal knowledge graph. The Organizer reads files from `input/`, uses an LLM-backed critique loop to compile durable notes into `brain/`, and the frontend visualizes the resulting network with semantic connections and evolution history.
+This project captures content sent to a Telegram bot, enriches it with scrapers, web search, and extraction tools, then hands it to a deep agent with specialized subagents. Together they update the knowledge base with the new information while checking that each note meets the project's quality criteria, and the frontend visualizes the resulting network with semantic connections and evolution history.
+
+> **This was one of five projects selected for presentation at the Agentsday Hackathon on May 1, 2026.**
 
 ![Second Brain UI](image/ui.png)
-
-## Ideal Flow
-
-1. Capture Markdown from notes, articles, messages, or research.
-2. Drop the files into `input/`.
-3. Click **Scan** in the UI.
-4. The Organizer agent reads the existing brain plus the new inputs.
-5. The LLM critic loop improves notes and semantic links.
-6. Generated Markdown lands in `brain/`.
-7. The graph updates, highlights new nodes, and shows evolution.
-
-## What It Does
-
-| | Capability |
-| --- | --- |
-| `>>` | **Scan** new Markdown files from `input/`. |
-| `<>` | **Organize** notes with an LLM-backed critique loop. |
-| `##` | **Generate** clean Markdown into `brain/`. |
-| `~~` | **Connect** notes through shared TF-IDF terms. |
-| `??` | **Explain** each graph edge with the words that caused it. |
-| `++` | **Replay** graph evolution as new notes appear. |
-| `LS` | **Trace** model-backed Organizer runs in LangSmith. |
 
 ## Project Layout
 
